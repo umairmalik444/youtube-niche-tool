@@ -618,96 +618,6 @@
       font-size: 0.88rem;
     }
 
-    .server-indicator {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: #111a25;
-      color: var(--muted);
-      font-size: 0.82rem;
-    }
-
-    .server-indicator.connected {
-      border-color: rgba(69, 219, 143, 0.45);
-      color: #8aeebd;
-      background: rgba(69, 219, 143, 0.08);
-    }
-
-    .server-indicator.offline {
-      border-color: rgba(255, 126, 126, 0.45);
-      color: #ffb4b4;
-      background: rgba(255, 126, 126, 0.1);
-    }
-
-    .download-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-
-    .download-chip.downloaded {
-      background: rgba(69, 219, 143, 0.12);
-      border-color: rgba(69, 219, 143, 0.35);
-      color: #8aeebd;
-    }
-
-    .download-chip.downloading {
-      background: rgba(255, 212, 106, 0.12);
-      border-color: rgba(255, 212, 106, 0.3);
-      color: #ffe5a0;
-    }
-
-    .download-chip.pending {
-      background: rgba(146, 165, 185, 0.15);
-      border-color: rgba(146, 165, 185, 0.35);
-      color: #c4d1dd;
-    }
-
-    .download-chip.failed {
-      background: rgba(255, 126, 126, 0.14);
-      border-color: rgba(255, 126, 126, 0.35);
-      color: #ffbcbc;
-    }
-
-    .download-path {
-      max-width: 320px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: #bfd2e4;
-      font-size: 0.82rem;
-    }
-
-    .panel-toggle {
-      width: 100%;
-      height: 40px;
-      background: #101a25;
-      color: var(--text);
-      border: 0;
-      border-bottom: 1px solid var(--line);
-      text-align: left;
-      padding: 0 12px;
-      font-family: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .panel-body {
-      display: none;
-    }
-
-    .tracker-card.open .panel-body {
-      display: block;
-    }
-
     .inline-toggle input {
       width: auto;
       height: 20px;
@@ -1351,9 +1261,6 @@
             <input id="autoCheckToggle" type="checkbox" /> Auto-Track
             <span id="autoTrackPulse" class="status-dot gray"></span>
           </label>
-          <label class="inline-toggle" for="autoDownloadToggle">
-            <input id="autoDownloadToggle" type="checkbox" /> Auto-Download
-          </label>
           <label class="small-muted" for="autoCheckInterval">Check every</label>
           <select id="autoCheckInterval">
             <option value="60000">1 min</option>
@@ -1368,11 +1275,6 @@
           <button id="importTrackedBtn" class="btn btn-secondary" type="button">Import Tracked Channels</button>
           <input id="importTrackedInput" class="file-input-hidden" type="file" accept="application/json" />
         </div>
-        <div id="downloadServerIndicator" class="server-indicator offline" title="Run 'python download_server.py' in terminal">
-          <span id="downloadServerDot" class="status-dot red"></span>
-          <span id="downloadServerText">Download Server: Not Running</span>
-        </div>
-        <div id="downloadQueueIndicator" class="small-muted">Downloads: 0 in progress, 0 queued</div>
         <div id="trackerStatus" class="small-muted">Auto-tracking: OFF</div>
         <div id="trackerCycleStats" class="small-muted">Last cycle: -</div>
       </section>
@@ -1442,32 +1344,6 @@
                   </tr>
                 </thead>
                 <tbody id="alertsHistoryBody"></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <section id="downloadedVideosPanel" class="tracker-card" style="display:none;">
-          <button id="toggleDownloadedVideosBtn" class="panel-toggle" type="button">Downloaded Videos (0)</button>
-          <div id="downloadedVideosContent" class="panel-body">
-            <div style="padding: 10px 12px; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--line); align-items: center; justify-content: space-between;">
-              <div class="small-muted" id="downloadsFolderNote">Open Downloads Folder: -</div>
-              <button id="refreshDownloadHistoryBtn" class="btn btn-secondary" type="button">Refresh</button>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Timestamp</th>
-                    <th>Niche Folder</th>
-                    <th>Channel Name</th>
-                    <th>Video Title</th>
-                    <th>File Name</th>
-                    <th>File Size</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="downloadedVideosBody"></tbody>
               </table>
             </div>
           </div>
@@ -1633,10 +1509,8 @@
     const TRACKED_CHANNELS_STORAGE = "yt_niche_tool_tracked_channels";
     const ALERT_HISTORY_STORAGE = "yt_niche_tool_alert_history";
     const AUTO_CHECK_STORAGE = "yt_niche_tool_auto_check";
-    const AUTO_DOWNLOAD_STORAGE = "yt_niche_tool_auto_download";
     const SEEN_VIDEOS_STORAGE = "yt_niche_tool_seen_videos";
     const QUOTA_USED_TODAY_STORAGE = "quota_used_today";
-    const DOWNLOAD_SERVER_BASE = "http://localhost:8765";
     const CORS_PROXIES = [
       (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
       (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
@@ -1683,7 +1557,6 @@
     const checkNowBtn = document.getElementById("checkNowBtn");
     const addChannelBtn = document.getElementById("addChannelBtn");
     const autoCheckToggle = document.getElementById("autoCheckToggle");
-    const autoDownloadToggle = document.getElementById("autoDownloadToggle");
     const autoTrackPulse = document.getElementById("autoTrackPulse");
     const autoCheckInterval = document.getElementById("autoCheckInterval");
     const exportTrackedBtn = document.getElementById("exportTrackedBtn");
@@ -1743,17 +1616,7 @@
     const exportSavedNichesCsvBtn = document.getElementById("exportSavedNichesCsvBtn");
     const savedNichesBody = document.getElementById("savedNichesBody");
     const pastScansSelect = document.getElementById("pastScansSelect");
-    const downloadServerIndicator = document.getElementById("downloadServerIndicator");
-    const downloadServerDot = document.getElementById("downloadServerDot");
-    const downloadServerText = document.getElementById("downloadServerText");
-    const downloadQueueIndicator = document.getElementById("downloadQueueIndicator");
     const notificationBadge = document.getElementById("notificationBadge");
-    const downloadedVideosPanel = document.getElementById("downloadedVideosPanel");
-    const toggleDownloadedVideosBtn = document.getElementById("toggleDownloadedVideosBtn");
-    const downloadedVideosContent = document.getElementById("downloadedVideosContent");
-    const refreshDownloadHistoryBtn = document.getElementById("refreshDownloadHistoryBtn");
-    const downloadedVideosBody = document.getElementById("downloadedVideosBody");
-    const downloadsFolderNote = document.getElementById("downloadsFolderNote");
 
     let currentResults = [];
     let currentKeyword = "";
@@ -1773,22 +1636,12 @@
       country: ""
     };
     let autoCheckConfig = { enabled: false, intervalMs: 180000 };
-    let autoDownloadEnabled = false;
     let autoCheckTimer = null;
     let autoCheckCountdownTimer = null;
     let autoCheckNextRunAt = null;
     let isCheckingFeeds = false;
-    let downloadServerConnected = false;
-    let downloadServerPollTimer = null;
-    let downloadServerFailStreak = 0;
-    let downloadQueue = [];
-    let downloadInProgressCount = 0;
-    let downloadHistoryItems = [];
-    let pendingDownloadSyncTimer = null;
-    let downloadServerInfo = { downloads_folder: "" };
     let trackerActiveNiche = "All Channels";
     let trackerExpandedRows = {};
-    let trackerInlineErrors = {};
     let trackerLastCycleStats = { success: 0, total: 0, failed: 0 };
     let nicheSavedItems = [];
     let nicheScanHistory = [];
@@ -1815,7 +1668,6 @@
     loadTrackedChannels();
     loadAlertHistory();
     loadAutoCheckConfig();
-    loadAutoDownloadConfig();
     loadNicheSavedItems();
     loadNicheScanHistory();
 
@@ -1839,7 +1691,6 @@
     addChannelBtn.addEventListener("click", addChannelManuallyPrompt);
     autoCheckToggle.addEventListener("change", updateAutoCheckConfig);
     autoCheckInterval.addEventListener("change", updateAutoCheckConfig);
-    autoDownloadToggle.addEventListener("change", updateAutoDownloadConfig);
     exportTrackedBtn.addEventListener("click", exportTrackedChannels);
     importTrackedBtn.addEventListener("click", () => importTrackedInput.click());
     importTrackedInput.addEventListener("change", importTrackedChannels);
@@ -1879,8 +1730,6 @@
     exportSavedNichesCsvBtn.addEventListener("click", exportSavedNichesCsv);
     savedNichesBody.addEventListener("click", handleSavedNicheActions);
     pastScansSelect.addEventListener("change", loadPastScanByIndex);
-    toggleDownloadedVideosBtn.addEventListener("click", toggleDownloadedVideosPanel);
-    refreshDownloadHistoryBtn.addEventListener("click", () => fetchDownloadHistory({ showToastOnFail: true }));
     notificationBadge.addEventListener("click", requestNotificationPermission);
 
     updateTotalQuotaDisplay();
@@ -1892,9 +1741,6 @@
     renderSavedNiches();
     renderPastScansDropdown();
     resetNicheFilters();
-    updateDownloadQueueIndicator();
-    startDownloadServerPolling();
-    startPendingDownloadSync();
     initializeNotificationState();
 
     function switchTab(tab) {
@@ -3053,13 +2899,6 @@
       return getQuotaTodayState().used;
     }
 
-    function getTrackerDailyEstimate() {
-      const channels = Object.keys(trackedChannels).length;
-      const intervalMin = Math.max(1, Math.round(autoCheckConfig.intervalMs / 60000));
-      const checksPerDay = (24 * 60 / intervalMin) * channels;
-      return Math.round(checksPerDay);
-    }
-
     function updateTrackerQuotaDashboard() {
       if (!quotaTrackedChannels) return;
       const channels = Object.keys(trackedChannels).length;
@@ -3482,326 +3321,6 @@
       autoTrackPulse.classList.toggle("gray", !autoCheckConfig.enabled);
     }
 
-    function saveAutoDownloadConfig() {
-      safeSetLocalStorage(AUTO_DOWNLOAD_STORAGE, JSON.stringify({ enabled: autoDownloadEnabled }), "auto download settings");
-    }
-
-    function loadAutoDownloadConfig() {
-      const raw = localStorage.getItem(AUTO_DOWNLOAD_STORAGE);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          autoDownloadEnabled = !!parsed.enabled;
-        } catch (_) {
-          autoDownloadEnabled = false;
-        }
-      }
-      autoDownloadToggle.checked = autoDownloadEnabled;
-    }
-
-    function updateAutoDownloadConfig() {
-      autoDownloadEnabled = !!autoDownloadToggle.checked;
-      saveAutoDownloadConfig();
-      if (autoDownloadEnabled && autoCheckConfig.enabled && downloadServerConnected) {
-        alertHistory.forEach((entry) => {
-          const statusObj = getDownloadStatus(entry.videoId || "");
-          if (statusObj.status === "not_started" || statusObj.status === "pending" || statusObj.status === "failed") {
-            enqueueVideoDownload(getDownloadMetaFromAlert(entry), { force: statusObj.status === "failed" });
-          }
-        });
-      }
-      showToast(autoDownloadEnabled ? "Auto-Download enabled." : "Auto-Download disabled.");
-      renderAlertHistory();
-      renderTrackedChannels();
-    }
-
-    function getDownloadStorageKey(videoId) {
-      return `download_status_${videoId}`;
-    }
-
-    function normalizeDownloadStatus(record) {
-      const base = {
-        status: "not_started",
-        file_path: "",
-        downloaded_at: "",
-        file_size_mb: 0,
-        error: ""
-      };
-      if (!record || typeof record !== "object") return base;
-      return {
-        status: ["downloaded", "pending", "failed", "not_started", "downloading"].includes(record.status) ? record.status : "not_started",
-        file_path: String(record.file_path || ""),
-        downloaded_at: String(record.downloaded_at || ""),
-        file_size_mb: Number(record.file_size_mb || 0),
-        error: String(record.error || "")
-      };
-    }
-
-    function getDownloadStatus(videoId) {
-      if (!videoId) return normalizeDownloadStatus(null);
-      const raw = localStorage.getItem(getDownloadStorageKey(videoId));
-      if (!raw) return normalizeDownloadStatus(null);
-      try {
-        return normalizeDownloadStatus(JSON.parse(raw));
-      } catch (_) {
-        return normalizeDownloadStatus(null);
-      }
-    }
-
-    function setDownloadStatus(videoId, nextStatus) {
-      if (!videoId) return;
-      const merged = { ...getDownloadStatus(videoId), ...normalizeDownloadStatus(nextStatus) };
-      safeSetLocalStorage(getDownloadStorageKey(videoId), JSON.stringify(merged), `download status ${videoId}`);
-    }
-
-    function getDownloadStatusText(statusObj) {
-      if (statusObj.status === "downloaded") {
-        const size = Number(statusObj.file_size_mb || 0);
-        return { cls: "downloaded", text: `✅ Downloaded${size > 0 ? ` (${size.toFixed(2)} MB)` : ""}` };
-      }
-      if (statusObj.status === "downloading") return { cls: "downloading", text: "⬇️ Downloading..." };
-      if (statusObj.status === "pending") {
-        if ((statusObj.error || "").toLowerCase().includes("offline")) {
-          return { cls: "pending", text: "⚠️ Server offline - Manual download needed" };
-        }
-        return { cls: "pending", text: "⚠️ Pending" };
-      }
-      if (statusObj.status === "failed") return { cls: "failed", text: "❌ Failed" };
-      return { cls: "pending", text: "⚠️ Pending" };
-    }
-
-    function updateDownloadQueueIndicator() {
-      downloadQueueIndicator.textContent = `Downloads: ${downloadInProgressCount} in progress, ${downloadQueue.length} queued`;
-    }
-
-    function updateDownloadServerIndicator() {
-      downloadServerIndicator.classList.toggle("connected", downloadServerConnected);
-      downloadServerIndicator.classList.toggle("offline", !downloadServerConnected);
-      downloadServerDot.className = `status-dot ${downloadServerConnected ? "green" : "red"}`;
-      downloadServerText.textContent = downloadServerConnected ? "Download Server: Connected ✓" : "Download Server: Not Running";
-      downloadServerIndicator.title = downloadServerConnected
-        ? "Download server is reachable"
-        : "Run 'python download_server.py' in terminal";
-      downloadedVideosPanel.style.display = downloadServerConnected ? "block" : "none";
-      if (!downloadServerConnected) {
-        downloadsFolderNote.textContent = "Open Downloads Folder: -";
-      } else if (downloadServerInfo.downloads_folder) {
-        downloadsFolderNote.textContent = `Open Downloads Folder: ${downloadServerInfo.downloads_folder}`;
-      }
-    }
-
-    async function checkDownloadServerStatus() {
-      const wasConnected = downloadServerConnected;
-      try {
-        const response = await fetch(`${DOWNLOAD_SERVER_BASE}/status`, { cache: "no-store" });
-        if (!response.ok) throw new Error("status unavailable");
-        const data = await response.json();
-        downloadServerConnected = data && data.status === "running";
-        downloadServerInfo.downloads_folder = String(data.downloads_folder || "");
-        downloadServerFailStreak = 0;
-      } catch (_error) {
-        downloadServerFailStreak += 1;
-        // Only mark as disconnected after 2 consecutive failures to avoid
-        // false positives while the server is busy processing a download.
-        if (downloadServerFailStreak >= 2) {
-          downloadServerConnected = false;
-        }
-      }
-
-      if (wasConnected && !downloadServerConnected) {
-        alertHistory.forEach((entry) => {
-          const statusObj = getDownloadStatus(entry.videoId || "");
-          if (statusObj.status === "downloading" || statusObj.status === "pending") {
-            setDownloadStatus(entry.videoId, {
-              status: "failed",
-              error: "Download server disconnected",
-              downloaded_at: new Date().toISOString()
-            });
-          }
-        });
-      }
-
-      updateDownloadServerIndicator();
-      if (downloadServerConnected) {
-        fetchDownloadHistory({ showToastOnFail: false });
-        processDownloadQueue();
-      }
-      renderAlertHistory();
-      renderTrackedChannels();
-    }
-
-    function startDownloadServerPolling() {
-      checkDownloadServerStatus();
-      if (downloadServerPollTimer) clearInterval(downloadServerPollTimer);
-      downloadServerPollTimer = setInterval(checkDownloadServerStatus, 30000);
-    }
-
-    function getAlertByVideoId(videoId) {
-      return alertHistory.find((item) => item.videoId === videoId) || null;
-    }
-
-    function enqueueVideoDownload(meta, options = {}) {
-      const { force = false } = options;
-      if (!meta || !meta.videoId || !meta.videoUrl) return;
-      const current = getDownloadStatus(meta.videoId);
-      if (!force && (current.status === "downloaded" || current.status === "downloading")) return;
-
-      const alreadyQueued = downloadQueue.some((item) => item.videoId === meta.videoId);
-      if (alreadyQueued) return;
-
-      if (!downloadServerConnected) {
-        setDownloadStatus(meta.videoId, {
-          status: "pending",
-          file_path: "",
-          downloaded_at: "",
-          file_size_mb: 0,
-          error: "Server offline"
-        });
-        renderAlertHistory();
-        renderTrackedChannels();
-        return;
-      }
-
-      setDownloadStatus(meta.videoId, {
-        status: "pending",
-        error: "",
-        file_path: "",
-        downloaded_at: "",
-        file_size_mb: 0
-      });
-      downloadQueue.push(meta);
-      updateDownloadQueueIndicator();
-      processDownloadQueue();
-      renderAlertHistory();
-      renderTrackedChannels();
-    }
-
-    async function requestServerDownload(meta) {
-      const payload = {
-        url: meta.videoUrl,
-        channel_name: meta.channelTitle || "UnknownChannel",
-        niche: normalizeNicheTag(meta.nicheKeyword || "Uncategorized"),
-        video_title: meta.videoTitle || "Untitled"
-      };
-      const response = await fetch(`${DOWNLOAD_SERVER_BASE}/download`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (!response.ok || data.status !== "success") {
-        throw new Error(data.error || "Download request failed");
-      }
-      return data;
-    }
-
-    async function processDownloadQueue() {
-      if (!downloadServerConnected) return;
-      if (downloadInProgressCount > 0) return;
-      if (!downloadQueue.length) {
-        updateDownloadQueueIndicator();
-        return;
-      }
-
-      const next = downloadQueue.shift();
-      if (!next) {
-        updateDownloadQueueIndicator();
-        return;
-      }
-
-      downloadInProgressCount = 1;
-      updateDownloadQueueIndicator();
-      setDownloadStatus(next.videoId, {
-        status: "downloading",
-        error: "",
-        file_path: "",
-        downloaded_at: "",
-        file_size_mb: 0
-      });
-      renderAlertHistory();
-      renderTrackedChannels();
-
-      try {
-        await requestServerDownload(next);
-      } catch (error) {
-        setDownloadStatus(next.videoId, {
-          status: "failed",
-          error: error.message || "Failed to contact download server",
-          downloaded_at: new Date().toISOString()
-        });
-      } finally {
-        downloadInProgressCount = 0;
-        updateDownloadQueueIndicator();
-        renderAlertHistory();
-        renderTrackedChannels();
-        fetchDownloadHistory({ showToastOnFail: false });
-        if (downloadQueue.length) processDownloadQueue();
-      }
-    }
-
-    function applyHistoryToLocalStatuses(items) {
-      const byVideoUrl = new Map();
-      items.forEach((item) => {
-        const key = String(item.url || "").trim();
-        if (key) byVideoUrl.set(key, item);
-      });
-
-      alertHistory.forEach((entry) => {
-        if (!entry.videoId || !entry.videoUrl) return;
-        const existing = getDownloadStatus(entry.videoId);
-        const serverItem = byVideoUrl.get(entry.videoUrl);
-        if (!serverItem) return;
-        if (serverItem.status === "success") {
-          setDownloadStatus(entry.videoId, {
-            status: "downloaded",
-            file_path: serverItem.file_path || existing.file_path,
-            downloaded_at: serverItem.downloaded_at || existing.downloaded_at,
-            file_size_mb: Number(serverItem.file_size_mb || 0),
-            error: ""
-          });
-        } else if (serverItem.status === "error") {
-          setDownloadStatus(entry.videoId, {
-            status: "failed",
-            file_path: "",
-            downloaded_at: serverItem.downloaded_at || new Date().toISOString(),
-            file_size_mb: 0,
-            error: serverItem.error || "Download failed"
-          });
-        }
-      });
-    }
-
-    async function fetchDownloadHistory({ showToastOnFail }) {
-      if (!downloadServerConnected) return;
-      try {
-        const response = await fetch(`${DOWNLOAD_SERVER_BASE}/history`, { cache: "no-store" });
-        if (!response.ok) throw new Error("History endpoint unavailable");
-        const data = await response.json();
-        downloadHistoryItems = Array.isArray(data.items) ? data.items : [];
-        applyHistoryToLocalStatuses(downloadHistoryItems);
-        renderDownloadedVideosPanel();
-        renderAlertHistory();
-        renderTrackedChannels();
-      } catch (_error) {
-        if (showToastOnFail) showToast("Could not fetch download history.");
-      }
-    }
-
-    function startPendingDownloadSync() {
-      if (pendingDownloadSyncTimer) clearInterval(pendingDownloadSyncTimer);
-      pendingDownloadSyncTimer = setInterval(() => {
-        const hasPending = alertHistory.some((entry) => {
-          const status = getDownloadStatus(entry.videoId || "");
-          // Also poll for "failed" items — they may have succeeded on the server
-          // and just got wrongly marked failed by a transient disconnect.
-          return status.status === "pending" || status.status === "downloading" || status.status === "failed";
-        });
-        if (downloadServerConnected && hasPending) {
-          fetchDownloadHistory({ showToastOnFail: false });
-        }
-      }, 5000);
-    }
-
     function getTrackerGroups() {
       const groups = new Map();
       Object.values(trackedChannels).forEach((channel) => {
@@ -3912,71 +3431,11 @@
       return d.toLocaleString();
     }
 
-    function renderExpandedVideoDownloadStatus(videoId) {
-      const statusObj = getDownloadStatus(videoId || "");
-      const statusText = getDownloadStatusText(statusObj);
-      const path = statusObj.file_path
-        ? `<div class="download-path" title="${escapeHtml(statusObj.file_path)}">${escapeHtml(statusObj.file_path)}</div>`
-        : "";
-      return `<span class="download-chip ${statusText.cls}">${statusText.text}</span>${path}`;
-    }
-
-    function renderExpandedVideoActionButton(channel, video) {
-      const statusObj = getDownloadStatus(video.videoId || "");
-      if (statusObj.status === "downloaded") {
-        return `<button class="copy-btn" data-copy-path="${escapeHtml(statusObj.file_path || "")}" type="button">Copy Path</button>`;
-      }
-      if (statusObj.status === "downloading") {
-        return `<span class="small-muted">Downloading...</span>`;
-      }
-      const label = statusObj.status === "failed" ? "Re-download" : "Download";
-      const title = downloadServerConnected ? "" : "Start download_server.py first";
-      return `<button class="btn btn-secondary" data-download-video="${escapeHtml(video.videoId || "")}" data-download-url="${escapeHtml(video.videoUrl || "")}" data-download-title="${escapeHtml(video.title || "Untitled")}" data-download-channel="${escapeHtml(channel.channelTitle || "Unknown Channel")}" data-download-niche="${escapeHtml(channel.nicheKeyword || "Uncategorized")}" title="${escapeHtml(title)}" type="button">${label}</button>`;
-    }
-
-    function getDownloadMetaFromAlert(entry) {
-      return {
-        videoId: entry.videoId,
-        videoUrl: entry.videoUrl,
-        videoTitle: entry.videoTitle,
-        channelTitle: entry.channelTitle,
-        nicheKeyword: normalizeNicheTag(entry.nicheKeyword)
-      };
-    }
-
-    function queueAlertDownloadByVideoId(videoId, force = false) {
-      const entry = getAlertByVideoId(videoId);
-      if (!entry) {
-        showToast("Could not find this alert entry.");
-        return;
-      }
-      enqueueVideoDownload(getDownloadMetaFromAlert(entry), { force });
-      if (!downloadServerConnected) {
-        showToast("Download server offline. Start download_server.py first.");
-      }
-    }
-
     function handleAlertsTableActions(event) {
       const copyUrlBtn = event.target.closest("button[data-copy-alert]");
       if (copyUrlBtn) {
         const url = copyUrlBtn.getAttribute("data-copy-alert");
         if (url) copyToClipboard(url, "Video URL");
-        return;
-      }
-
-      const copyPathBtn = event.target.closest("button[data-copy-path]");
-      if (copyPathBtn) {
-        const path = copyPathBtn.getAttribute("data-copy-path");
-        if (path) copyToClipboard(path, "File path");
-        return;
-      }
-
-      const downloadBtn = event.target.closest("button[data-download-alert]");
-      if (downloadBtn) {
-        const videoId = downloadBtn.getAttribute("data-download-alert") || "";
-        const statusObj = getDownloadStatus(videoId);
-        const force = statusObj.status === "failed";
-        queueAlertDownloadByVideoId(videoId, force);
       }
     }
 
@@ -4055,8 +3514,6 @@
               <tr>
                 <td><a href="${video.videoUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(video.title)}</a></td>
                 <td>${escapeHtml(formatRelativeTime(video.publishedAt))}</td>
-                <td>${renderExpandedVideoDownloadStatus(video.videoId)}</td>
-                <td>${renderExpandedVideoActionButton(channel, video)}</td>
               </tr>
             `).join("");
             expandedRow.innerHTML = `
@@ -4072,8 +3529,6 @@
                         <tr>
                           <th>Video Title</th>
                           <th>Published</th>
-                          <th>Download Status</th>
-                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>${rowsHtml}</tbody>
@@ -4100,12 +3555,6 @@
       }
       const fragment = document.createDocumentFragment();
       alertHistory.forEach((entry) => {
-        const statusObj = getDownloadStatus(entry.videoId || "");
-        const statusText = getDownloadStatusText(statusObj);
-        const needsButton = statusObj.status !== "downloaded";
-        const canRetry = statusObj.status === "failed";
-        const actionLabel = canRetry ? "Re-download" : "Download";
-        const actionTitle = !downloadServerConnected ? "Start download_server.py first" : "";
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${escapeHtml(formatSmartTimestamp(entry.detectedAt))}</td>
@@ -4113,9 +3562,7 @@
           <td>
             <a href="${entry.videoUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.videoTitle)}</a>
             <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-              <span class="download-chip ${statusText.cls}">${statusText.text}</span>
               <button class="copy-btn" data-copy-alert="${escapeHtml(entry.videoUrl)}" type="button">Copy URL</button>
-              ${needsButton ? `<button class="btn btn-secondary" data-download-alert="${escapeHtml(entry.videoId || "")}" title="${escapeHtml(actionTitle)}" type="button">${actionLabel}</button>` : ""}
             </div>
           </td>
           <td>${escapeHtml(normalizeNicheTag(entry.nicheKeyword))}</td>
@@ -4164,38 +3611,6 @@
         if (!channelId) return;
         trackerExpandedRows[channelId] = { ...(trackerExpandedRows[channelId] || {}), open: false };
         renderTrackedChannels();
-        return;
-      }
-
-      const copyBtn = event.target.closest("button[data-copy-video], button[data-copy-alert]");
-      if (copyBtn) {
-        const url = copyBtn.getAttribute("data-copy-video") || copyBtn.getAttribute("data-copy-alert");
-        if (url) copyToClipboard(url, "Video URL");
-        return;
-      }
-
-      const copyPathBtn = event.target.closest("button[data-copy-path]");
-      if (copyPathBtn) {
-        const path = copyPathBtn.getAttribute("data-copy-path");
-        if (path) copyToClipboard(path, "File path");
-        return;
-      }
-
-      const downloadVideoBtn = event.target.closest("button[data-download-video]");
-      if (downloadVideoBtn) {
-        const videoId = downloadVideoBtn.getAttribute("data-download-video") || "";
-        const meta = {
-          videoId,
-          videoUrl: downloadVideoBtn.getAttribute("data-download-url") || "",
-          videoTitle: downloadVideoBtn.getAttribute("data-download-title") || "Untitled",
-          channelTitle: downloadVideoBtn.getAttribute("data-download-channel") || "Unknown Channel",
-          nicheKeyword: downloadVideoBtn.getAttribute("data-download-niche") || "Uncategorized"
-        };
-        const statusObj = getDownloadStatus(videoId);
-        enqueueVideoDownload(meta, { force: statusObj.status === "failed" });
-        if (!downloadServerConnected) {
-          showToast("Download server offline. Start download_server.py first.");
-        }
         return;
       }
 
@@ -4286,52 +3701,8 @@
       toggleAlertHistoryBtn.textContent = open ? "Expand" : "Collapse";
     }
 
-    function toggleDownloadedVideosPanel() {
-      const isOpen = downloadedVideosPanel.classList.contains("open");
-      downloadedVideosPanel.classList.toggle("open", !isOpen);
-      toggleDownloadedVideosBtn.textContent = isOpen
-        ? `Downloaded Videos (${downloadHistoryItems.length})`
-        : `Downloaded Videos (${downloadHistoryItems.length})`;
-      downloadedVideosContent.style.display = isOpen ? "none" : "block";
-    }
-
-    function renderDownloadedVideosPanel() {
-      toggleDownloadedVideosBtn.textContent = `Downloaded Videos (${downloadHistoryItems.length})`;
-      downloadedVideosBody.innerHTML = "";
-      if (!downloadHistoryItems.length) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = '<td colspan="7" class="small-muted">No downloads in history yet.</td>';
-        downloadedVideosBody.appendChild(tr);
-        return;
-      }
-
-      const fragment = document.createDocumentFragment();
-      downloadHistoryItems.forEach((item) => {
-        const path = String(item.file_path || "");
-        const fileName = path ? path.split("/").pop() : "-";
-        const nicheFolder = path && path.includes("/") ? path.split("/")[1] || "-" : "-";
-        const statusLabel = item.on_disk ? "on disk" : "missing";
-        const statusCls = item.on_disk ? "downloaded" : "failed";
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${escapeHtml(formatSmartTimestamp(item.downloaded_at || ""))}</td>
-          <td>${escapeHtml(nicheFolder)}</td>
-          <td>${escapeHtml(item.channel_name || "-")}</td>
-          <td>${escapeHtml(item.video_title || "-")}</td>
-          <td>${escapeHtml(fileName || "-")}</td>
-          <td>${Number(item.file_size_mb || 0).toFixed(2)} MB</td>
-          <td><span class="download-chip ${statusCls}">${escapeHtml(statusLabel)}</span></td>
-        `;
-        fragment.appendChild(tr);
-      });
-      downloadedVideosBody.appendChild(fragment);
-    }
-
     function clearAlertHistory() {
       if (!confirm("Clear all alert history?")) return;
-      alertHistory.forEach((entry) => {
-        if (entry.videoId) safeRemoveLocalStorage(getDownloadStorageKey(entry.videoId));
-      });
       alertHistory = [];
       saveAlertHistory();
       renderAlertHistory();
@@ -4343,15 +3714,13 @@
         showToast("No alert history to export.");
         return;
       }
-      const header = ["Timestamp", "Channel Name", "Niche", "Video Title", "Video URL", "Download Status", "File Path"];
+      const header = ["Timestamp", "Channel Name", "Niche", "Video Title", "Video URL"];
       const rows = alertHistory.map((item) => [
         item.detectedAt,
         item.channelTitle,
         normalizeNicheTag(item.nicheKeyword),
         item.videoTitle,
-        item.videoUrl,
-        getDownloadStatus(item.videoId || "").status,
-        getDownloadStatus(item.videoId || "").file_path
+        item.videoUrl
       ]);
       const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -4522,38 +3891,6 @@
     function addAlertRecord(record) {
       alertHistory.unshift(record);
       alertHistory = alertHistory.slice(0, 200);
-      const existingStatus = getDownloadStatus(record.videoId);
-      if (existingStatus.status === "not_started") {
-        setDownloadStatus(record.videoId, {
-          status: "not_started",
-          file_path: "",
-          downloaded_at: "",
-          file_size_mb: 0,
-          error: ""
-        });
-      }
-
-      if (autoCheckConfig.enabled && autoDownloadEnabled) {
-        if (downloadServerConnected) {
-          enqueueVideoDownload(getDownloadMetaFromAlert(record), { force: false });
-        } else {
-          setDownloadStatus(record.videoId, {
-            status: "pending",
-            file_path: "",
-            downloaded_at: "",
-            file_size_mb: 0,
-            error: "Server offline"
-          });
-        }
-      } else if (!downloadServerConnected) {
-        setDownloadStatus(record.videoId, {
-          status: "pending",
-          file_path: "",
-          downloaded_at: "",
-          file_size_mb: 0,
-          error: "Server offline"
-        });
-      }
 
       saveAlertHistory();
       renderAlertHistory();
@@ -4645,21 +3982,72 @@
       };
     }
 
-    function parseChannelIdInput(value) {
+    function parseChannelInput(value) {
       const input = String(value || "").trim();
-      if (!input) return "";
-      if (/^[A-Za-z0-9_-]{20,30}$/.test(input)) return input;
-      const match = input.match(/[?&]channel_id=([A-Za-z0-9_-]{20,30})/) || input.match(/\/channel\/([A-Za-z0-9_-]{20,30})/);
-      return match ? match[1] : "";
+      if (!input) return { kind: "none", value: "" };
+
+      const directId = input.match(/^(UC[A-Za-z0-9_-]{20,30})$/i);
+      if (directId) return { kind: "id", value: directId[1] };
+
+      const channelIdInUrl = input.match(/[?&]channel_id=(UC[A-Za-z0-9_-]{20,30})/i)
+        || input.match(/\/channel\/(UC[A-Za-z0-9_-]{20,30})/i);
+      if (channelIdInUrl) return { kind: "id", value: channelIdInUrl[1] };
+
+      const handleInUrl = input.match(/youtube\.com\/@([A-Za-z0-9._-]+)/i)
+        || input.match(/^@([A-Za-z0-9._-]+)$/i);
+      if (handleInUrl) return { kind: "handle", value: handleInUrl[1] };
+
+      const userInUrl = input.match(/youtube\.com\/user\/([A-Za-z0-9._-]+)/i);
+      if (userInUrl) return { kind: "username", value: userInUrl[1] };
+
+      const customInUrl = input.match(/youtube\.com\/c\/([A-Za-z0-9._-]+)/i)
+        || input.match(/youtube\.com\/([^/?#]+)$/i);
+      if (customInUrl) return { kind: "query", value: customInUrl[1] };
+
+      return { kind: "query", value: input };
+    }
+
+    async function resolveChannelIdFromInput(rawInput, apiKey) {
+      const parsed = parseChannelInput(rawInput);
+      if (!parsed.value) return "";
+      if (parsed.kind === "id") return parsed.value;
+
+      if (parsed.kind === "handle") {
+        const handleUrl = buildUrl("channels", {
+          part: "id",
+          forHandle: parsed.value,
+          key: apiKey
+        });
+        const handleData = await fetchJson(handleUrl);
+        const handleItem = Array.isArray(handleData.items) ? handleData.items[0] : null;
+        if (handleItem?.id) return handleItem.id;
+      }
+
+      if (parsed.kind === "username") {
+        const userUrl = buildUrl("channels", {
+          part: "id",
+          forUsername: parsed.value,
+          key: apiKey
+        });
+        const userData = await fetchJson(userUrl);
+        const userItem = Array.isArray(userData.items) ? userData.items[0] : null;
+        if (userItem?.id) return userItem.id;
+      }
+
+      const searchUrl = buildUrl("search", {
+        part: "snippet",
+        type: "channel",
+        maxResults: "1",
+        q: parsed.value,
+        key: apiKey
+      });
+      const searchData = await fetchJson(searchUrl);
+      const searchItem = Array.isArray(searchData.items) ? searchData.items[0] : null;
+      return searchItem?.snippet?.channelId || "";
     }
 
     async function addChannelManuallyPrompt() {
       const raw = prompt("Enter YouTube channel ID or channel URL");
-      const channelId = parseChannelIdInput(raw);
-      if (!channelId) {
-        showToast("Invalid channel ID or URL.");
-        return;
-      }
       const nicheTag = normalizeNicheTag(prompt("Enter niche/keyword tag", "Uncategorized"));
       const apiKey = apiKeyInput.value.trim();
       if (!apiKey) {
@@ -4667,6 +4055,11 @@
         return;
       }
       try {
+        const channelId = await resolveChannelIdFromInput(raw, apiKey);
+        if (!channelId) {
+          showToast("Invalid channel ID or URL.");
+          return;
+        }
         const metadata = await fetchChannelMetadataById(channelId, apiKey);
         const added = await addChannelToTracker(metadata, nicheTag);
         renderTrackedChannels();
@@ -5013,8 +4406,7 @@
         seenVideos,
         proxyPreferences,
         alertsHistory: alertHistory.slice(0, 200),
-        autoTrackSettings: autoCheckConfig,
-        autoDownloadSettings: { enabled: autoDownloadEnabled }
+        autoTrackSettings: autoCheckConfig
       };
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -5085,12 +4477,6 @@
           saveAutoCheckConfig();
           autoCheckToggle.checked = autoCheckConfig.enabled;
           autoCheckInterval.value = String(autoCheckConfig.intervalMs);
-        }
-
-        if (parsed.autoDownloadSettings && typeof parsed.autoDownloadSettings === "object") {
-          autoDownloadEnabled = !!parsed.autoDownloadSettings.enabled;
-          autoDownloadToggle.checked = autoDownloadEnabled;
-          saveAutoDownloadConfig();
         }
 
         saveTrackedChannels();
