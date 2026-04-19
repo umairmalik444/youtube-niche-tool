@@ -1264,7 +1264,7 @@
     <section class="header">
       <div class="header-top">
         <h1>YouTube Niche Discovery Tool</h1>
-        <button id="notificationBadge" class="notification-badge" type="button">🔔 Enable Notifications</button>
+        <button id="notificationBadge" class="notification-badge" type="button"><span id="notificationText">🔔 Enable Notifications</span></button>
       </div>
       <p class="sub">Find short-form channels getting high view momentum in the last 30 days (US region).</p>
     </section>
@@ -1815,6 +1815,7 @@
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
             <button id="testGoogleSheetBtn" class="btn btn-secondary" type="button">Test Connection</button>
             <button id="syncNowBtn" class="btn" type="button">Sync Now</button>
+            <button class="btn btn-secondary" type="button" onclick="testNotification()">🔔 Test Notification</button>
           </div>
           <div>
             <label class="inline-toggle" for="autoSyncToggle">
@@ -2482,6 +2483,7 @@
     const savedNichesBody = document.getElementById("savedNichesBody");
     const pastScansSelect = document.getElementById("pastScansSelect");
     const notificationBadge = document.getElementById("notificationBadge");
+    const notificationText = document.getElementById("notificationText");
 
     let currentResults = [];
     let currentKeyword = "";
@@ -2621,7 +2623,7 @@
     exportSavedNichesCsvBtn.addEventListener("click", exportSavedNichesCsv);
     savedNichesBody.addEventListener("click", handleSavedNicheActions);
     pastScansSelect.addEventListener("change", loadPastScanByIndex);
-    notificationBadge.addEventListener("click", requestNotificationPermission);
+    notificationBadge.addEventListener("click", handleNotificationBadgeClick);
     apiKeyInput.addEventListener("input", renderApiKeyUsageDashboard);
     alertsPageExportBtn.addEventListener("click", exportAlertsCsv);
     alertsPageClearBtn.addEventListener("click", clearAlertHistory);
@@ -5678,8 +5680,7 @@
     function ensureNotificationPermission() {
       if (!("Notification" in window)) return Promise.resolve(false);
       if (Notification.permission === "granted") return Promise.resolve(true);
-      if (Notification.permission === "denied") return Promise.resolve(false);
-      return Notification.requestPermission().then((permission) => permission === "granted");
+      return Promise.resolve(false);
     }
 
     function supportsWebPush() {
@@ -5698,10 +5699,29 @@
     }
 
     async function registerServiceWorker() {
-      if (!supportsWebPush()) return null;
+      if (!("serviceWorker" in navigator)) return null;
       if (serviceWorkerRegistration) return serviceWorkerRegistration;
       try {
-        serviceWorkerRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+        const swCode = `
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SHOW_NOTIFICATION") {
+    self.registration.showNotification(event.data.title, {
+      body: event.data.body,
+      icon: "https://www.youtube.com/favicon.ico",
+      badge: "https://www.youtube.com/favicon.ico",
+      tag: event.data.tag || ("yt-alert-" + Date.now()),
+      requireInteraction: true,
+      vibrate: [200, 100, 200]
+    });
+  }
+});`;
+        const blob = new Blob([swCode], { type: "application/javascript" });
+        const swUrl = URL.createObjectURL(blob);
+        serviceWorkerRegistration = await navigator.serviceWorker.register(swUrl);
+        window.swRegistration = serviceWorkerRegistration;
+        URL.revokeObjectURL(swUrl);
         return serviceWorkerRegistration;
       } catch (error) {
         console.warn("Service worker registration failed:", error);
@@ -5710,9 +5730,10 @@
     }
 
     async function subscribeToWebPush() {
+      if (!supportsWebPush()) return false;
       if (Notification.permission !== "granted") return false;
       const registration = await registerServiceWorker();
-      if (!registration) return false;
+      if (!registration || !registration.pushManager) return false;
 
       try {
         const existing = await registration.pushManager.getSubscription();
@@ -5765,7 +5786,6 @@
     }
 
     async function initializeWebPush() {
-      if (!supportsWebPush()) return;
       await registerServiceWorker();
       if (Notification.permission === "granted") {
         await subscribeToWebPush();
@@ -5774,47 +5794,88 @@
 
     function updateNotificationBadge() {
       if (!notificationBadge) return;
-      notificationBadge.classList.remove("active", "blocked");
+      const textEl = notificationText || document.getElementById("notificationText");
+      const setText = (value) => {
+        if (textEl) textEl.textContent = value;
+        else notificationBadge.textContent = value;
+      };
+
+      notificationBadge.classList.remove("active", "blocked", "disabled");
       if (!("Notification" in window)) {
-        notificationBadge.textContent = "Notifications Unsupported";
+        setText("Not Supported");
+        notificationBadge.classList.add("disabled");
         notificationBadge.disabled = true;
         return;
       }
+
       notificationBadge.disabled = false;
       if (Notification.permission === "granted") {
-        notificationBadge.textContent = webPushSubscriptionActive ? "✓ Push Active" : "✓ Notifications Active";
+        setText("✓ Notifications Active");
         notificationBadge.classList.add("active");
+        notificationBadge.style.borderColor = "var(--accent)";
+        notificationBadge.style.background = "rgba(61, 217, 165, 0.25)";
       } else if (Notification.permission === "denied") {
-        notificationBadge.textContent = "⚠ Notifications Blocked";
+        setText("⚠ Notifications Blocked");
         notificationBadge.classList.add("blocked");
+        notificationBadge.style.borderColor = "var(--danger)";
+        notificationBadge.style.background = "rgba(255, 106, 106, 0.15)";
       } else {
-        notificationBadge.textContent = "🔔 Enable Notifications";
+        setText("🔔 Enable Notifications");
+        notificationBadge.style.borderColor = "var(--accent)";
+        notificationBadge.style.background = "rgba(61, 217, 165, 0.15)";
+      }
+    }
+
+    async function handleNotificationBadgeClick() {
+      if (!("Notification" in window)) {
+        showToast("This browser does not support notifications");
+        return;
+      }
+
+      if (Notification.permission === "granted") {
+        try {
+          new Notification("🔔 Test Notification", {
+            body: "Notifications are working!",
+            icon: "https://www.youtube.com/favicon.ico"
+          });
+          showToast("✅ Notifications already active - test sent!");
+        } catch (error) {
+          showToast(`Error sending test notification: ${error.message}`);
+        }
+        updateNotificationBadge();
+        return;
+      }
+
+      if (Notification.permission === "denied") {
+        showToast("⚠️ Notifications blocked. Go to browser settings > Site Settings > Notifications > Allow for this site");
+        updateNotificationBadge();
+        return;
+      }
+
+      try {
+        const permission = await Notification.requestPermission();
+        updateNotificationBadge();
+        if (permission === "granted") {
+          new Notification("🔔 Notifications Enabled!", {
+            body: "You will now receive alerts for new videos",
+            icon: "https://www.youtube.com/favicon.ico"
+          });
+          await subscribeToWebPush();
+          showToast("✅ Notifications enabled!");
+        } else {
+          showToast("⚠️ Notification permission denied");
+        }
+      } catch (error) {
+        showToast(`Error requesting permission: ${error.message}`);
       }
     }
 
     async function requestNotificationPermission(options = {}) {
-      const silent = !!options.silent;
-      if (!("Notification" in window)) {
-        if (!silent) showToast("⚠ Notifications are not supported in this browser");
+      if (options && options.silent) {
+        updateNotificationBadge();
         return;
       }
-      if (Notification.permission === "default") {
-        const permission = await Notification.requestPermission();
-        if (permission === "granted") {
-          await subscribeToWebPush();
-          if (!silent) showToast("✅ Notifications enabled!");
-          startBackgroundChecks();
-        } else if (permission === "denied") {
-          if (!silent) showToast("⚠️ Notifications blocked in browser settings");
-        }
-      } else if (Notification.permission === "granted") {
-        await subscribeToWebPush();
-        if (!silent) showToast("✅ Notifications already enabled");
-        startBackgroundChecks();
-      } else {
-        if (!silent) showToast("⚠️ Notifications blocked in browser settings");
-      }
-      updateNotificationBadge();
+      await handleNotificationBadgeClick();
     }
 
     function startBackgroundChecks() {
@@ -5835,7 +5896,6 @@
 
     function initializeNotificationState() {
       updateNotificationBadge();
-      requestNotificationPermission({ silent: true });
     }
 
     function playAlertBeep() {
@@ -5855,18 +5915,45 @@
       oscillator.stop(audioCtx.currentTime + 0.2);
     }
 
-    function sendNotification(channel, videoTitle) {
-      if (!("Notification" in window) || Notification.permission !== "granted") return;
-      const body = `${channel}: ${videoTitle}`;
-      if (serviceWorkerRegistration) {
-        serviceWorkerRegistration.showNotification("🎯 New Video!", {
-          body,
-          tag: `video-alert-${Date.now()}`,
-          renotify: true
-        });
+    function sendPushNotification(channelTitle, videoTitle) {
+      if (!("Notification" in window)) return;
+      if (Notification.permission !== "granted") return;
+
+      const title = "🎯 New Video Alert!";
+      const body = `${channelTitle}: ${videoTitle}`;
+
+      try {
+        if (window.swRegistration && window.swRegistration.active) {
+          window.swRegistration.active.postMessage({
+            type: "SHOW_NOTIFICATION",
+            title,
+            body,
+            tag: `yt-alert-${Date.now()}`
+          });
+          console.log("✅ SW notification sent");
+        } else {
+          new Notification(title, {
+            body,
+            icon: "https://www.youtube.com/favicon.ico",
+            badge: "https://www.youtube.com/favicon.ico",
+            tag: `yt-alert-${Date.now()}`,
+            requireInteraction: true,
+            vibrate: [200, 100, 200]
+          });
+          console.log("✅ Regular notification sent");
+        }
+      } catch (error) {
+        console.error("Notification failed:", error);
+      }
+    }
+
+    function testNotification() {
+      if (!("Notification" in window) || Notification.permission !== "granted") {
+        showToast("Enable notifications first by clicking the badge in header");
         return;
       }
-      new Notification("🎯 New Video!", { body });
+      sendPushNotification("Test Channel", "This is a test notification");
+      showToast("Test notification sent!");
     }
 
     async function triggerServerPush(record) {
@@ -5916,7 +6003,7 @@
       saveAlertHistory();
       renderAlertHistory();
       addLiveAlert(record);
-      sendNotification(record.channelTitle, record.videoTitle);
+      sendPushNotification(record.channelTitle, record.videoTitle);
       triggerServerPush(record);
       playAlertBeep();
     }
