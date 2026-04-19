@@ -5343,15 +5343,27 @@
     }
 
     function getSyncIdentity() {
-      const accessCode = String(localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "").trim().toUpperCase();
-      const canonicalMemberId = accessCode ? `member_${accessCode}` : "";
-      const resolvedMemberId = canonicalMemberId
-        || String(localStorage.getItem("memberId") || "").trim()
-        || String(memberProfile.memberId || "").trim()
-        || generateMemberId();
+      let accessCode = String(localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "").trim().toUpperCase();
+      if (!accessCode) {
+        const existingMemberId = String(localStorage.getItem("memberId") || memberProfile.memberId || "").trim();
+        const match = existingMemberId.match(/^member_(.+)$/i);
+        if (match && match[1]) {
+          accessCode = String(match[1]).trim().toUpperCase();
+        }
+      }
+      if (!accessCode && isAdmin()) {
+        accessCode = "ADMIN";
+      }
+      if (!accessCode) {
+        accessCode = generateAccessCode();
+      }
+
+      const resolvedMemberId = `member_${accessCode}`;
       const resolvedMemberName = String(localStorage.getItem("memberName") || memberProfile.name || "Unknown").trim() || "Unknown";
 
       // Keep local and profile identity aligned with sync payloads.
+      localStorage.setItem("accessCode", accessCode);
+      safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
       localStorage.setItem("memberId", resolvedMemberId);
       localStorage.setItem("memberName", resolvedMemberName);
       memberProfile.memberId = resolvedMemberId;
@@ -7036,11 +7048,12 @@
           if (!member) throw new Error("Invalid access code");
           if (member.status === "blocked") throw new Error("Your access has been blocked.");
           memberProfile.name = member.name || "Member";
-          memberProfile.memberId = member.memberId;
+          memberProfile.memberId = `member_${accessCode}`;
           memberProfile.googleSheetUrl = getRegistrationSheetUrl();
-          localStorage.setItem("memberId", member.memberId || `member_${accessCode}`);
+          localStorage.setItem("memberId", `member_${accessCode}`);
           localStorage.setItem("memberName", memberProfile.name || "Member");
           localStorage.setItem("accessCode", accessCode);
+          safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
           localStorage.setItem(MEMBER_SLACK_WEBHOOK_STORAGE, String(member.slackWebhookUrl || ""));
           saveMemberProfile();
           hideRoleModal();
@@ -7060,6 +7073,10 @@
           showRoleModal();
           return;
         }
+        const adminAccessCode = String(localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "ADMIN").trim().toUpperCase() || "ADMIN";
+        localStorage.setItem("accessCode", adminAccessCode);
+        safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, adminAccessCode, "member access code");
+        localStorage.setItem("memberId", `member_${adminAccessCode}`);
         hideRoleModal();
         initApp();
         return;
@@ -7070,12 +7087,16 @@
     async function loginAsAdmin() {
       const enteredPin = String(adminPinInput.value || "").trim();
       const existingPin = localStorage.getItem(ADMIN_PIN_STORAGE);
+      const adminAccessCode = String(localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "ADMIN").trim().toUpperCase() || "ADMIN";
       if (existingPin) {
         if (enteredPin !== existingPin) {
           showAccessCodeError("Incorrect admin PIN.");
           return;
         }
         localStorage.setItem(USER_ROLE_STORAGE, "admin");
+        localStorage.setItem("accessCode", adminAccessCode);
+        safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, adminAccessCode, "member access code");
+        localStorage.setItem("memberId", `member_${adminAccessCode}`);
         hideAccessCodeError();
         hideRoleModal();
         initApp();
@@ -7095,9 +7116,12 @@
 
       localStorage.setItem(USER_ROLE_STORAGE, "admin");
       localStorage.setItem(ADMIN_PIN_STORAGE, enteredPin);
+      localStorage.setItem("accessCode", adminAccessCode);
+      safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, adminAccessCode, "member access code");
+      localStorage.setItem("memberId", `member_${adminAccessCode}`);
       safeSetLocalStorage(GOOGLE_SHEET_URL_STORAGE, setupUrl, "google sheet url");
       memberProfile.name = memberProfile.name || "Admin";
-      memberProfile.memberId = memberProfile.memberId || (`admin_${Math.random().toString(36).slice(2, 8)}`);
+      memberProfile.memberId = `member_${adminAccessCode}`;
       memberProfile.googleSheetUrl = setupUrl;
       saveMemberProfile();
       hideAccessCodeError();
