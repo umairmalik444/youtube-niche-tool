@@ -618,6 +618,37 @@
       font-size: 0.88rem;
     }
 
+    .ultra-badge {
+      appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #111a25;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .ultra-badge.active {
+      border-color: rgba(255, 212, 106, 0.5);
+      background: rgba(255, 212, 106, 0.14);
+      color: #ffe5a0;
+      box-shadow: 0 0 0 3px rgba(255, 212, 106, 0.12);
+    }
+
+    .ultra-badge:focus-visible {
+      outline: 2px solid rgba(255, 212, 106, 0.8);
+      outline-offset: 2px;
+    }
+
     .inline-toggle input {
       width: auto;
       height: 20px;
@@ -1263,6 +1294,7 @@
           </label>
           <label class="small-muted" for="autoCheckInterval">Check every</label>
           <select id="autoCheckInterval">
+            <option value="30000">30 sec (Ultra)</option>
             <option value="60000">1 min</option>
             <option value="120000">2 min</option>
             <option value="180000" selected>3 min</option>
@@ -1271,6 +1303,15 @@
             <option value="900000">15 min</option>
             <option value="1800000">30 min</option>
           </select>
+          <label class="small-muted" for="alertWindowSelect">Just released window</label>
+          <select id="alertWindowSelect">
+            <option value="60000">1 min</option>
+            <option value="120000">2 min</option>
+            <option value="180000">3 min</option>
+            <option value="240000">4 min</option>
+            <option value="300000" selected>5 min</option>
+          </select>
+          <button id="ultraModeBadge" class="ultra-badge" type="button" aria-pressed="false" title="Quick toggle: Ultra 30s / Normal 3min">Ultra Mode: OFF</button>
           <button id="exportTrackedBtn" class="btn btn-secondary" type="button">Export Tracked Channels</button>
           <button id="importTrackedBtn" class="btn btn-secondary" type="button">Import Tracked Channels</button>
           <input id="importTrackedInput" class="file-input-hidden" type="file" accept="application/json" />
@@ -1287,6 +1328,7 @@
           <div class="small-muted">Tracked channels: <strong id="quotaTrackedChannels">0</strong></div>
           <div class="small-muted">Auto-track method: <strong id="quotaAutoMethod">RSS (free - no quota used)</strong></div>
           <div class="small-muted">Check interval: <strong id="quotaInterval">every 3 min</strong></div>
+          <div class="small-muted">Alert window: <strong id="quotaAlertWindow">last 5 min</strong></div>
           <div class="small-muted">Quota used today: <strong id="quotaUsedToday">0 units</strong></div>
           <div class="small-muted">Full 10,000 daily quota available for discovery</div>
         </div>
@@ -1510,6 +1552,11 @@
     const ALERT_HISTORY_STORAGE = "yt_niche_tool_alert_history";
     const AUTO_CHECK_STORAGE = "yt_niche_tool_auto_check";
     const SEEN_VIDEOS_STORAGE = "yt_niche_tool_seen_videos";
+    const DEFAULT_ALERT_WINDOW_MS = 300000;
+    const ALERT_WINDOW_OPTIONS = [60000, 120000, 180000, 240000, 300000];
+    const ULTRA_CHECK_INTERVAL_MS = 30000;
+    const ULTRA_ALERT_WINDOW_MS = 60000;
+    const ULTRA_RETRY_COOLDOWN_MS = 120000;
     const QUOTA_USED_TODAY_STORAGE = "quota_used_today";
     const CORS_PROXIES = [
       (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
@@ -1521,6 +1568,7 @@
     ];
     const NICHE_SAVED_STORAGE = "yt_niche_saved_items";
     const NICHE_SCAN_HISTORY_STORAGE = "yt_niche_scan_history";
+    const PUSH_SERVER_BASE = window.location.port === "8765" ? window.location.origin : "http://127.0.0.1:8765";
 
     const apiKeyInput = document.getElementById("apiKey");
     const keywordInput = document.getElementById("keyword");
@@ -1559,6 +1607,8 @@
     const autoCheckToggle = document.getElementById("autoCheckToggle");
     const autoTrackPulse = document.getElementById("autoTrackPulse");
     const autoCheckInterval = document.getElementById("autoCheckInterval");
+    const alertWindowSelect = document.getElementById("alertWindowSelect");
+    const ultraModeBadge = document.getElementById("ultraModeBadge");
     const exportTrackedBtn = document.getElementById("exportTrackedBtn");
     const importTrackedBtn = document.getElementById("importTrackedBtn");
     const importTrackedInput = document.getElementById("importTrackedInput");
@@ -1571,6 +1621,7 @@
     const quotaTrackedChannels = document.getElementById("quotaTrackedChannels");
     const quotaAutoMethod = document.getElementById("quotaAutoMethod");
     const quotaInterval = document.getElementById("quotaInterval");
+    const quotaAlertWindow = document.getElementById("quotaAlertWindow");
     const quotaUsedToday = document.getElementById("quotaUsedToday");
     const tabDiscovery = document.getElementById("tabDiscovery");
     const tabTracker = document.getElementById("tabTracker");
@@ -1635,11 +1686,12 @@
       maxChannelAgeDays: Infinity,
       country: ""
     };
-    let autoCheckConfig = { enabled: false, intervalMs: 180000 };
+    let autoCheckConfig = { enabled: false, intervalMs: 180000, alertWindowMs: DEFAULT_ALERT_WINDOW_MS };
     let autoCheckTimer = null;
     let autoCheckCountdownTimer = null;
     let autoCheckNextRunAt = null;
     let isCheckingFeeds = false;
+    let channelRetryAfter = {};
     let trackerActiveNiche = "All Channels";
     let trackerExpandedRows = {};
     let trackerLastCycleStats = { success: 0, total: 0, failed: 0 };
@@ -1652,6 +1704,8 @@
     let nicheScanInProgress = false;
     let nicheScanCancelRequested = false;
     let nicheCurrentQuotaUsed = 0;
+    let serviceWorkerRegistration = null;
+    let webPushSubscriptionActive = false;
 
     const nicheCategories = [
       { id: 26, name: "Howto & Style", description: "Epoxy, cleaning, restoration, DIY, detailing", seedQuery: "how to" },
@@ -1691,6 +1745,8 @@
     addChannelBtn.addEventListener("click", addChannelManuallyPrompt);
     autoCheckToggle.addEventListener("change", updateAutoCheckConfig);
     autoCheckInterval.addEventListener("change", updateAutoCheckConfig);
+    alertWindowSelect.addEventListener("change", updateAutoCheckConfig);
+    ultraModeBadge.addEventListener("click", toggleUltraModeQuick);
     exportTrackedBtn.addEventListener("click", exportTrackedChannels);
     importTrackedBtn.addEventListener("click", () => importTrackedInput.click());
     importTrackedInput.addEventListener("change", importTrackedChannels);
@@ -1742,6 +1798,7 @@
     renderPastScansDropdown();
     resetNicheFilters();
     initializeNotificationState();
+    initializeWebPush();
 
     function switchTab(tab) {
       const isDiscovery = tab === "discovery";
@@ -2902,14 +2959,16 @@
     function updateTrackerQuotaDashboard() {
       if (!quotaTrackedChannels) return;
       const channels = Object.keys(trackedChannels).length;
-      const intervalMin = Math.max(1, Math.round(autoCheckConfig.intervalMs / 60000));
+      const intervalSec = Math.max(30, Math.round(autoCheckConfig.intervalMs / 1000));
+      const alertWindowMin = Math.max(1, Math.round(Number(autoCheckConfig.alertWindowMs || DEFAULT_ALERT_WINDOW_MS) / 60000));
       const usedToday = getDailyQuotaUsed();
 
       quotaTrackedChannels.textContent = String(channels);
       if (quotaAutoMethod) {
         quotaAutoMethod.textContent = "RSS (free - no quota used)";
       }
-      quotaInterval.textContent = `every ${intervalMin} min`;
+      quotaInterval.textContent = intervalSec < 60 ? `every ${intervalSec} sec` : `every ${Math.round(intervalSec / 60)} min`;
+      if (quotaAlertWindow) quotaAlertWindow.textContent = `last ${alertWindowMin} min`;
       quotaUsedToday.textContent = `${usedToday} units`;
     }
 
@@ -3309,16 +3368,50 @@
           const parsed = JSON.parse(raw);
           autoCheckConfig.enabled = !!parsed.enabled;
           autoCheckConfig.intervalMs = Number(parsed.intervalMs || 180000);
+          autoCheckConfig.alertWindowMs = Number(parsed.alertWindowMs || DEFAULT_ALERT_WINDOW_MS);
         } catch (_) {
         }
       }
-      if (![60000, 120000, 180000, 300000, 600000, 900000, 1800000].includes(autoCheckConfig.intervalMs)) {
+      if (![30000, 60000, 120000, 180000, 300000, 600000, 900000, 1800000].includes(autoCheckConfig.intervalMs)) {
         autoCheckConfig.intervalMs = 180000;
+      }
+      if (!ALERT_WINDOW_OPTIONS.includes(autoCheckConfig.alertWindowMs)) {
+        autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
+      }
+      if (autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS) {
+        autoCheckConfig.alertWindowMs = ULTRA_ALERT_WINDOW_MS;
       }
       autoCheckToggle.checked = autoCheckConfig.enabled;
       autoCheckInterval.value = String(autoCheckConfig.intervalMs);
+      alertWindowSelect.value = String(autoCheckConfig.alertWindowMs);
       autoTrackPulse.classList.toggle("pulse-green", autoCheckConfig.enabled);
       autoTrackPulse.classList.toggle("gray", !autoCheckConfig.enabled);
+      updateUltraModeBadge();
+    }
+
+    function updateUltraModeBadge() {
+      if (!ultraModeBadge) return;
+      const isUltra = autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS;
+      ultraModeBadge.textContent = isUltra ? "Ultra Mode: ON" : "Ultra Mode: OFF";
+      ultraModeBadge.classList.toggle("active", isUltra);
+      ultraModeBadge.setAttribute("aria-pressed", isUltra ? "true" : "false");
+      ultraModeBadge.setAttribute("title", isUltra
+        ? "Quick toggle: switch to Normal 3min mode"
+        : "Quick toggle: switch to Ultra 30s mode");
+    }
+
+    function toggleUltraModeQuick() {
+      const isUltra = autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS;
+      if (isUltra) {
+        autoCheckInterval.value = "180000";
+        if (Number(alertWindowSelect.value || 0) === ULTRA_ALERT_WINDOW_MS) {
+          alertWindowSelect.value = String(DEFAULT_ALERT_WINDOW_MS);
+        }
+      } else {
+        autoCheckInterval.value = String(ULTRA_CHECK_INTERVAL_MS);
+        alertWindowSelect.value = String(ULTRA_ALERT_WINDOW_MS);
+      }
+      updateAutoCheckConfig();
     }
 
     function getTrackerGroups() {
@@ -3778,11 +3871,110 @@
       });
     }
 
+    function getAlertEligibleVideos(entries) {
+      const alertWindowMs = Number(autoCheckConfig.alertWindowMs || DEFAULT_ALERT_WINDOW_MS);
+      const threshold = Date.now() - alertWindowMs;
+      return entries.filter((entry) => {
+        const ts = new Date(entry.publishedAt).getTime();
+        return !Number.isNaN(ts) && ts >= threshold;
+      });
+    }
+
     function ensureNotificationPermission() {
       if (!("Notification" in window)) return Promise.resolve(false);
       if (Notification.permission === "granted") return Promise.resolve(true);
       if (Notification.permission === "denied") return Promise.resolve(false);
       return Notification.requestPermission().then((permission) => permission === "granted");
+    }
+
+    function supportsWebPush() {
+      return "serviceWorker" in navigator && "PushManager" in window;
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    async function registerServiceWorker() {
+      if (!supportsWebPush()) return null;
+      if (serviceWorkerRegistration) return serviceWorkerRegistration;
+      try {
+        serviceWorkerRegistration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+        return serviceWorkerRegistration;
+      } catch (error) {
+        console.warn("Service worker registration failed:", error);
+        return null;
+      }
+    }
+
+    async function subscribeToWebPush() {
+      if (Notification.permission !== "granted") return false;
+      const registration = await registerServiceWorker();
+      if (!registration) return false;
+
+      try {
+        const existing = await registration.pushManager.getSubscription();
+        if (existing) {
+          webPushSubscriptionActive = true;
+          updateNotificationBadge();
+          return true;
+        }
+
+        const keyResponse = await fetch(`${PUSH_SERVER_BASE}/push/public-key`);
+        if (!keyResponse.ok) {
+          webPushSubscriptionActive = false;
+          updateNotificationBadge();
+          return false;
+        }
+        const keyData = await keyResponse.json();
+        const publicKey = String(keyData.publicKey || "").trim();
+        if (!publicKey) {
+          webPushSubscriptionActive = false;
+          updateNotificationBadge();
+          return false;
+        }
+
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+
+        const subscribeResponse = await fetch(`${PUSH_SERVER_BASE}/push/subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subscription })
+        });
+
+        if (!subscribeResponse.ok) {
+          webPushSubscriptionActive = false;
+          updateNotificationBadge();
+          return false;
+        }
+
+        webPushSubscriptionActive = true;
+        updateNotificationBadge();
+        return true;
+      } catch (error) {
+        console.warn("Web push subscription failed:", error);
+        webPushSubscriptionActive = false;
+        updateNotificationBadge();
+        return false;
+      }
+    }
+
+    async function initializeWebPush() {
+      if (!supportsWebPush()) return;
+      await registerServiceWorker();
+      if (Notification.permission === "granted") {
+        await subscribeToWebPush();
+      }
     }
 
     function updateNotificationBadge() {
@@ -3795,7 +3987,7 @@
       }
       notificationBadge.disabled = false;
       if (Notification.permission === "granted") {
-        notificationBadge.textContent = "✓ Notifications Active";
+        notificationBadge.textContent = webPushSubscriptionActive ? "✓ Push Active" : "✓ Notifications Active";
         notificationBadge.classList.add("active");
       } else if (Notification.permission === "denied") {
         notificationBadge.textContent = "⚠ Notifications Blocked";
@@ -3814,12 +4006,14 @@
       if (Notification.permission === "default") {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
+          await subscribeToWebPush();
           if (!silent) showToast("✅ Notifications enabled!");
           startBackgroundChecks();
         } else if (permission === "denied") {
           if (!silent) showToast("⚠️ Notifications blocked in browser settings");
         }
       } else if (Notification.permission === "granted") {
+        await subscribeToWebPush();
         if (!silent) showToast("✅ Notifications already enabled");
         startBackgroundChecks();
       } else {
@@ -3831,8 +4025,13 @@
     function startBackgroundChecks() {
       autoCheckConfig.enabled = true;
       autoCheckConfig.intervalMs = 180000;
+      if (!ALERT_WINDOW_OPTIONS.includes(Number(autoCheckConfig.alertWindowMs))) {
+        autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
+      }
       autoCheckToggle.checked = true;
       autoCheckInterval.value = "180000";
+      alertWindowSelect.value = String(autoCheckConfig.alertWindowMs);
+      updateUltraModeBadge();
       saveAutoCheckConfig();
       applyAutoCheckTimer();
       updateTrackerQuotaDashboard();
@@ -3863,9 +4062,36 @@
 
     function sendNotification(channel, videoTitle) {
       if (!("Notification" in window) || Notification.permission !== "granted") return;
-      new Notification("🎯 New Video!", {
-        body: `${channel}: ${videoTitle}`
-      });
+      const body = `${channel}: ${videoTitle}`;
+      if (serviceWorkerRegistration) {
+        serviceWorkerRegistration.showNotification("🎯 New Video!", {
+          body,
+          tag: `video-alert-${Date.now()}`,
+          renotify: true
+        });
+        return;
+      }
+      new Notification("🎯 New Video!", { body });
+    }
+
+    async function triggerServerPush(record) {
+      if (!webPushSubscriptionActive) return;
+      try {
+        await fetch(`${PUSH_SERVER_BASE}/push/notify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: "🎯 New Video!",
+            body: `${record.channelTitle}: ${record.videoTitle}`,
+            url: record.videoUrl,
+            channelId: record.channelId,
+            videoId: record.videoId,
+            tag: `video-${record.videoId}`
+          })
+        });
+      } catch (error) {
+        console.warn("Server push trigger failed:", error);
+      }
     }
 
     function addLiveAlert(record) {
@@ -3896,6 +4122,7 @@
       renderAlertHistory();
       addLiveAlert(record);
       sendNotification(record.channelTitle, record.videoTitle);
+      triggerServerPush(record);
       playAlertBeep();
     }
 
@@ -4124,6 +4351,7 @@
     async function runChannelCheckApi(channel, { triggerAlerts }) {
       const entries = await fetchLatestUploadsByApi(channel.channelId);
       const last24h = getLast24HourVideos(entries);
+      const alertCandidates = getAlertEligibleVideos(entries);
       const seenSet = new Set(loadSeenVideosForChannel(channel.channelId));
       const entryIds = entries.map((entry) => entry.videoId);
 
@@ -4135,7 +4363,7 @@
       }
 
       const newVideos = triggerAlerts
-        ? last24h.filter((entry) => !isSeen(channel.channelId, entry.videoId))
+        ? alertCandidates.filter((entry) => !isSeen(channel.channelId, entry.videoId))
         : [];
 
       if (triggerAlerts && newVideos.length) {
@@ -4175,9 +4403,10 @@
 
       const entries = parseRssEntries(xmlText);
       const last24h = getLast24HourVideos(entries);
+      const alertCandidates = getAlertEligibleVideos(entries);
       const seenSet = new Set(loadSeenVideosForChannel(channel.channelId));
       const entryIds = entries.map((entry) => entry.videoId);
-      const newVideos = last24h.filter((entry) => !isSeen(channel.channelId, entry.videoId));
+      const newVideos = alertCandidates.filter((entry) => !isSeen(channel.channelId, entry.videoId));
 
       if (newVideos.length) {
         for (const video of newVideos) {
@@ -4291,6 +4520,8 @@
         return;
       }
       const channelsCount = Object.keys(trackedChannels).length;
+      const isUltra = autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS;
+      const alertWindowMin = Math.max(1, Math.round(Number(autoCheckConfig.alertWindowMs || DEFAULT_ALERT_WINDOW_MS) / 60000));
       let countdown = "starting...";
       if (autoCheckNextRunAt) {
         const left = Math.max(0, Math.floor((autoCheckNextRunAt - Date.now()) / 1000));
@@ -4298,7 +4529,7 @@
         const ss = String(left % 60).padStart(2, "0");
         countdown = `${mm}:${ss}`;
       }
-      trackerStatus.textContent = `Auto-tracking: ON - Next check in ${countdown} - ${channelsCount} channels via RSS (free)`;
+      trackerStatus.textContent = `Auto-tracking: ${isUltra ? "ULTRA" : "ON"} - Next check in ${countdown} - ${channelsCount} channels via RSS (free) - alerts for last ${alertWindowMin} min`;
       if (trackerCycleStats) {
         trackerCycleStats.textContent = `Last cycle: ${trackerLastCycleStats.success}/${trackerLastCycleStats.total} channels checked successfully - ${trackerLastCycleStats.failed} failed (will retry)`;
       }
@@ -4315,6 +4546,7 @@
     async function runAutoTrackingCycle() {
       if (!autoCheckConfig.enabled || isCheckingFeeds) return;
       const startedAt = Date.now();
+      const isUltra = autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS;
       const channels = Object.values(trackedChannels);
       if (!channels.length) {
         autoCheckNextRunAt = Date.now() + autoCheckConfig.intervalMs;
@@ -4328,27 +4560,41 @@
       let totalNew = 0;
       let successCount = 0;
       let failedCount = 0;
+      let checkedCount = 0;
       for (let i = 0; i < channels.length; i++) {
         if (!autoCheckConfig.enabled) break;
         const channel = channels[i];
+        if (isUltra) {
+          const retryAt = Number(channelRetryAfter[channel.channelId] || 0);
+          if (retryAt > Date.now()) {
+            continue;
+          }
+        }
+        checkedCount += 1;
         updateTrackerStatusLine(`Auto-tracking: ON - Checking ${channel.channelTitle}... (${i + 1}/${channels.length}) - via RSS (free)`);
         try {
           const result = await runChannelCheckRss(channel);
           totalNew += result.newCount;
-          if (result.ok) successCount += 1;
-          else failedCount += 1;
+          if (result.ok) {
+            successCount += 1;
+            if (isUltra) delete channelRetryAfter[channel.channelId];
+          } else {
+            failedCount += 1;
+            if (isUltra) channelRetryAfter[channel.channelId] = Date.now() + ULTRA_RETRY_COOLDOWN_MS;
+          }
         } catch (_error) {
           failedCount += 1;
+          if (isUltra) channelRetryAfter[channel.channelId] = Date.now() + ULTRA_RETRY_COOLDOWN_MS;
         }
-        await sleep(300);
+        await sleep(isUltra ? 100 : 300);
       }
       isCheckingFeeds = false;
       saveTrackedChannels();
       renderTrackedChannels();
 
-      trackerLastCycleStats = { success: successCount, total: channels.length, failed: failedCount };
+      trackerLastCycleStats = { success: successCount, total: checkedCount, failed: failedCount };
       if (trackerCycleStats) {
-        trackerCycleStats.textContent = `Last cycle: ${successCount}/${channels.length} channels checked successfully - ${failedCount} failed (will retry)`;
+        trackerCycleStats.textContent = `Last cycle: ${successCount}/${checkedCount} channels checked successfully - ${failedCount} failed (will retry)`;
       }
 
       const elapsed = Date.now() - startedAt;
@@ -4372,12 +4618,14 @@
         autoTrackPulse.classList.remove("pulse-green");
         autoTrackPulse.classList.add("gray");
         autoCheckNextRunAt = null;
+        updateUltraModeBadge();
         updateTrackerStatusLine();
         return;
       }
 
       autoTrackPulse.classList.add("pulse-green");
       autoTrackPulse.classList.remove("gray");
+      updateUltraModeBadge();
       autoCheckNextRunAt = Date.now();
       startCountdownTicker();
       updateTrackerStatusLine();
@@ -4387,10 +4635,23 @@
     function updateAutoCheckConfig() {
       autoCheckConfig.enabled = autoCheckToggle.checked;
       autoCheckConfig.intervalMs = Number(autoCheckInterval.value || 180000);
+      autoCheckConfig.alertWindowMs = Number(alertWindowSelect.value || DEFAULT_ALERT_WINDOW_MS);
+      if (!ALERT_WINDOW_OPTIONS.includes(autoCheckConfig.alertWindowMs)) {
+        autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
+      }
+      if (autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS) {
+        autoCheckConfig.alertWindowMs = ULTRA_ALERT_WINDOW_MS;
+        alertWindowSelect.value = String(ULTRA_ALERT_WINDOW_MS);
+      }
+      updateUltraModeBadge();
       saveAutoCheckConfig();
       applyAutoCheckTimer();
       updateTrackerQuotaDashboard();
-      showToast(autoCheckConfig.enabled ? "Auto-Track enabled." : "Auto-Track disabled.");
+      const alertWindowMin = Math.max(1, Math.round(autoCheckConfig.alertWindowMs / 60000));
+      const isUltra = autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS;
+      showToast(autoCheckConfig.enabled
+        ? `${isUltra ? "Ultra mode ON." : "Auto-Track enabled."} Alert window: ${alertWindowMin} min.`
+        : "Auto-Track disabled.");
     }
 
     function exportTrackedChannels() {
@@ -4474,9 +4735,14 @@
         if (parsed.autoTrackSettings && typeof parsed.autoTrackSettings === "object") {
           autoCheckConfig.enabled = !!parsed.autoTrackSettings.enabled;
           autoCheckConfig.intervalMs = Number(parsed.autoTrackSettings.intervalMs || 180000);
+          autoCheckConfig.alertWindowMs = Number(parsed.autoTrackSettings.alertWindowMs || DEFAULT_ALERT_WINDOW_MS);
+          if (!ALERT_WINDOW_OPTIONS.includes(autoCheckConfig.alertWindowMs)) {
+            autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
+          }
           saveAutoCheckConfig();
           autoCheckToggle.checked = autoCheckConfig.enabled;
           autoCheckInterval.value = String(autoCheckConfig.intervalMs);
+          alertWindowSelect.value = String(autoCheckConfig.alertWindowMs);
         }
 
         saveTrackedChannels();
