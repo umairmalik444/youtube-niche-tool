@@ -1219,6 +1219,44 @@
       color: var(--text);
       border: 1px solid var(--line);
     }
+
+    .role-cards {
+      display: grid;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .role-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: var(--card-2);
+      display: grid;
+      gap: 10px;
+    }
+
+    .role-card h3 {
+      margin: 0;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .error-text {
+      margin: 0;
+      color: #ff8e8e;
+      font-size: 0.85rem;
+    }
+
+    .code-display {
+      font-family: "Courier New", monospace;
+      letter-spacing: 1px;
+      font-size: 1rem;
+      color: #9de8ff;
+      background: #0c1622;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
   </style>
 </head>
 <body>
@@ -1857,6 +1895,40 @@
             </div>
           </div>
         </section>
+
+        <section class="tracker-card" style="margin-top: 12px;">
+          <h3>Team Members Management</h3>
+          <div class="table-wrap" style="padding: 12px 12px 0 12px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Access Code</th>
+                  <th>Status</th>
+                  <th>Last Active</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="teamMembersManagementBody"></tbody>
+            </table>
+          </div>
+
+          <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;align-items:end;">
+            <div>
+              <label for="newMemberNameInput">Member Name</label>
+              <input id="newMemberNameInput" type="text" placeholder="e.g. Hamza" autocomplete="off" />
+            </div>
+            <div>
+              <label>Generated Access Code</label>
+              <div id="generatedAccessCodeDisplay" class="code-display">-</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="generateAccessCodeBtn" class="btn btn-secondary" type="button">Generate Access Code</button>
+              <button id="addTeamMemberBtn" class="btn" type="button">Add Member</button>
+            </div>
+          </div>
+        </section>
       </div>
 
       <!-- MEMBER ONLY -->
@@ -1900,129 +1972,222 @@
       <div style="font-size:3rem;">🎯</div>
       <h2>YouTube Niche Discovery Tool</h2>
       <p>Select your role to continue:</p>
-      <div class="role-btn-wrap">
-        <button id="roleSelectAdmin" class="btn role-btn" type="button">🔑 I'm the Admin</button>
-        <button id="roleSelectMember" class="btn role-btn role-btn-member" type="button">👤 I'm a Team Member</button>
+
+      <div class="role-cards">
+        <div class="role-card" id="adminLoginCard">
+          <h3>🔑 Admin</h3>
+          <input type="password" id="adminPinInput" placeholder="Enter Admin PIN" maxlength="4" autocomplete="off" />
+          <button id="loginAsAdminBtn" class="btn role-btn" type="button">Login as Admin</button>
+        </div>
+
+        <div class="role-card" id="memberLoginCard">
+          <h3>👤 Team Member</h3>
+          <input type="text" id="accessCodeInput" placeholder="Enter your Access Code" maxlength="6" autocomplete="off" />
+          <button id="loginAsMemberBtn" class="btn role-btn role-btn-member" type="button">Join</button>
+          <p class="error-text" id="accessCodeError" style="display:none;">Invalid Access Code. Contact your admin.</p>
+        </div>
       </div>
     </div>
   </div>
 
   <!--
   Google Apps Script (copy into Extensions > Apps Script in your Google Sheet):
-  function doPost(e) {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet();
-    var data = JSON.parse(e.postData.contents);
-    var action = data.action;
-
-    if (action === "sync_member") {
-      var memberSheet = sheet.getSheetByName("Members") || sheet.insertSheet("Members");
-      var memberData = data.memberData;
-      var rows = memberSheet.getDataRange().getValues();
-      var found = false;
-      for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0] === memberData.memberId) {
-          memberSheet.getRange(i + 1, 1, 1, 7).setValues([[
-            memberData.memberId,
-            memberData.name,
-            memberData.apiKey ? memberData.apiKey.substring(0, 8) + "..." : "",
-            memberData.trackedChannelsCount,
-            memberData.nichesTracking,
-            memberData.lastActive,
-            memberData.alertsToday
-          ]]);
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        if (rows.length <= 1) {
-          memberSheet.getRange(1, 1, 1, 7).setValues([["Member ID", "Name", "API Key (masked)", "Tracked Channels", "Niches", "Last Active", "Alerts Today"]]);
-        }
-        memberSheet.appendRow([
-          memberData.memberId,
-          memberData.name,
-          memberData.apiKey ? memberData.apiKey.substring(0, 8) + "..." : "",
-          memberData.trackedChannelsCount,
-          memberData.nichesTracking,
-          memberData.lastActive,
-          memberData.alertsToday
-        ]);
-      }
-      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    if (action === "sync_channels") {
-      var channelSheet = sheet.getSheetByName("TrackedChannels") || sheet.insertSheet("TrackedChannels");
-      var channelData = data.channels;
-      var memberId = data.memberId;
-      var rows = channelSheet.getDataRange().getValues();
-      for (var j = rows.length - 1; j >= 1; j--) {
-        if (rows[j][0] === memberId) channelSheet.deleteRow(j + 1);
-      }
-      if (rows.length <= 1) {
-        channelSheet.getRange(1, 1, 1, 8).setValues([["Member ID", "Member Name", "Channel Name", "Channel ID", "Subscribers", "Niche", "Date Added", "Last Checked"]]);
-      }
-      channelData.forEach(function(ch) {
-        channelSheet.appendRow([memberId, data.memberName, ch.channelTitle, ch.channelId, ch.subscriberCount, ch.nicheKeyword, ch.dateAdded, ch.lastChecked]);
-      });
-      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    if (action === "sync_alerts") {
-      var alertSheet = sheet.getSheetByName("Alerts") || sheet.insertSheet("Alerts");
-      var alerts = data.alerts;
-      var member = data.memberId;
-      if (alertSheet.getLastRow() <= 1) {
-        alertSheet.getRange(1, 1, 1, 7).setValues([["Member ID", "Member Name", "Timestamp", "Channel", "Video Title", "Video ID", "Niche"]]);
-      }
-      alerts.forEach(function(alert) {
-        alertSheet.appendRow([member, data.memberName, alert.timestamp, alert.channelTitle, alert.videoTitle, alert.videoId, alert.niche]);
-      });
-      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({error: "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
-  }
+  const SHEETS = {
+    Members: ["memberId", "name", "role", "apiKeyMasked", "trackedChannelsCount", "nichesTracking", "lastActive", "alertsToday"],
+    TeamMembers: ["Name", "Access Code", "Status", "Created At", "Created By", "Last Active"],
+    TrackedChannels: ["memberId", "memberName", "channelTitle", "channelId", "subscriberCount", "nicheKeyword", "dateAdded", "lastChecked"],
+    Alerts: ["memberId", "memberName", "timestamp", "channelTitle", "videoTitle", "videoId", "niche"],
+    APIKeys: ["memberId", "memberName", "apiKeyMasked", "addedAt", "status"]
+  };
 
   function doGet(e) {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet();
-    var result = {};
-    var memberSheet = sheet.getSheetByName("Members");
-    if (memberSheet) {
-      var memberData = memberSheet.getDataRange().getValues();
-      var headers = memberData[0] || [];
-      result.members = memberData.slice(1).map(function(row) {
-        var obj = {};
-        headers.forEach(function(h, i) { obj[h] = row[i]; });
-        return obj;
-      });
+    ensureAllSheets_();
+    return jsonResponse_({
+      ok: true,
+      members: readSheetAsObjects_("TeamMembers"),
+      channels: readSheetAsObjects_("TrackedChannels"),
+      alerts: readSheetAsObjects_("Alerts"),
+      apiKeys: readSheetAsObjects_("APIKeys")
+    });
+  }
+
+  function doPost(e) {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      ensureAllSheets_();
+      var data = JSON.parse(e.postData.contents);
+      var action = String(data.action || "");
+
+      if (action === "sync_member") return handleSyncMember_(data);
+      if (action === "sync_channels") return handleSyncChannels_(data);
+      if (action === "sync_alerts") return handleSyncAlerts_(data);
+      if (action === "sync_api_key") return handleSyncApiKey_(data);
+      if (action === "add_member") return handleAddMember_(data);
+      if (action === "update_member_status") return handleUpdateMemberStatus_(data);
+      if (action === "remove_member") return handleRemoveMember_(data);
+
+      return jsonResponse_({ ok: false, error: "Unknown action" });
+    } finally {
+      lock.releaseLock();
     }
-    var channelSheet = sheet.getSheetByName("TrackedChannels");
-    if (channelSheet) {
-      var channelData = channelSheet.getDataRange().getValues();
-      var channelHeaders = channelData[0] || [];
-      result.channels = channelData.slice(1).map(function(row) {
-        var obj = {};
-        channelHeaders.forEach(function(h, i) { obj[h] = row[i]; });
-        return obj;
-      });
+  }
+
+  function handleSyncMember_(data) {
+    const m = data.memberData || data.member || {};
+    const memberId = String(m.memberId || "");
+    if (!memberId) return jsonResponse_({ ok: false, error: "memberId required" });
+    upsertByCol_(ensureSheet_("Members", SHEETS.Members), 1, memberId, [
+      memberId,
+      String(m.name || ""),
+      String(m.role || "member"),
+      String(m.apiKeyMasked || ""),
+      Number(m.trackedChannelsCount || 0),
+      Array.isArray(m.nichesTracking) ? m.nichesTracking.join(", ") : String(m.nichesTracking || ""),
+      String(m.lastActive || new Date().toISOString()),
+      Number(m.alertsToday || 0)
+    ]);
+    return jsonResponse_({ ok: true });
+  }
+
+  function handleSyncChannels_(data) {
+    const memberId = String(data.memberId || "");
+    const memberName = String(data.memberName || "");
+    const channels = Array.isArray(data.channels) ? data.channels : [];
+    const sheet = ensureSheet_("TrackedChannels", SHEETS.TrackedChannels);
+    deleteByCol_(sheet, 1, memberId);
+    channels.forEach(function(ch) {
+      sheet.appendRow([
+        memberId,
+        memberName,
+        String(ch.channelTitle || ""),
+        String(ch.channelId || ""),
+        Number(ch.subscriberCount || 0),
+        String(ch.nicheKeyword || ""),
+        String(ch.dateAdded || ""),
+        String(ch.lastChecked || "")
+      ]);
+    });
+    return jsonResponse_({ ok: true });
+  }
+
+  function handleSyncAlerts_(data) {
+    const memberId = String(data.memberId || "");
+    const memberName = String(data.memberName || "");
+    const alerts = Array.isArray(data.alerts) ? data.alerts : [];
+    const sheet = ensureSheet_("Alerts", SHEETS.Alerts);
+    alerts.forEach(function(a) {
+      sheet.appendRow([
+        memberId,
+        memberName,
+        String(a.timestamp || ""),
+        String(a.channelTitle || ""),
+        String(a.videoTitle || ""),
+        String(a.videoId || ""),
+        String(a.niche || "")
+      ]);
+    });
+    return jsonResponse_({ ok: true });
+  }
+
+  function handleSyncApiKey_(data) {
+    const item = data.apiKeyInfo || data;
+    const memberId = String(item.memberId || "");
+    const masked = String(item.apiKeyMasked || "");
+    upsertByCol_(ensureSheet_("APIKeys", SHEETS.APIKeys), 1, memberId, [
+      memberId,
+      String(item.memberName || ""),
+      masked,
+      String(item.addedAt || new Date().toISOString()),
+      String(item.status || "active")
+    ]);
+    return jsonResponse_({ ok: true });
+  }
+
+  function handleAddMember_(data) {
+    const m = data.member || {};
+    const code = String(m.accessCode || "").toUpperCase();
+    upsertByCol_(ensureSheet_("TeamMembers", SHEETS.TeamMembers), 2, code, [
+      String(m.name || ""),
+      code,
+      String(m.status || "pending"),
+      String(m.createdAt || new Date().toISOString()),
+      String(m.createdBy || "admin"),
+      String(m.lastActive || "")
+    ]);
+    return jsonResponse_({ success: true });
+  }
+
+  function handleUpdateMemberStatus_(data) {
+    const code = String(data.accessCode || "").toUpperCase();
+    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][1] || "").toUpperCase() === code) {
+        if (data.status) sheet.getRange(i + 1, 3).setValue(String(data.status));
+        if (data.lastActive !== undefined) sheet.getRange(i + 1, 6).setValue(String(data.lastActive || ""));
+        break;
+      }
     }
-    var alertSheet = sheet.getSheetByName("Alerts");
-    if (alertSheet) {
-      var alertData = alertSheet.getDataRange().getValues();
-      var alertHeaders = alertData[0] || [];
-      result.alerts = alertData.slice(1).map(function(row) {
-        var obj = {};
-        alertHeaders.forEach(function(h, i) { obj[h] = row[i]; });
-        return obj;
-      });
+    return jsonResponse_({ success: true });
+  }
+
+  function handleRemoveMember_(data) {
+    const code = String(data.accessCode || "").toUpperCase();
+    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const rows = sheet.getDataRange().getValues();
+    for (var i = rows.length - 1; i >= 1; i--) {
+      if (String(rows[i][1] || "").toUpperCase() === code) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
     }
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse_({ success: true });
+  }
+
+  function ensureAllSheets_() { Object.keys(SHEETS).forEach(function(n) { ensureSheet_(n, SHEETS[n]); }); }
+  function ensureSheet_(name, headers) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+    if (sh.getLastRow() === 0) sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    return sh;
+  }
+  function readSheetAsObjects_(name) {
+    var sh = ensureSheet_(name, SHEETS[name]);
+    var vals = sh.getDataRange().getValues();
+    if (vals.length <= 1) return [];
+    var headers = vals[0];
+    return vals.slice(1).map(function(r) {
+      var o = {};
+      headers.forEach(function(h, i) { o[h] = r[i]; });
+      return o;
+    });
+  }
+  function upsertByCol_(sheet, colIndex1Based, value, rowData) {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      if (String(rows[i][colIndex1Based - 1] || "") === String(value || "")) {
+        sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
+        return;
+      }
+    }
+    sheet.appendRow(rowData);
+  }
+  function deleteByCol_(sheet, colIndex1Based, value) {
+    var rows = sheet.getDataRange().getValues();
+    for (var i = rows.length - 1; i >= 1; i--) {
+      if (String(rows[i][colIndex1Based - 1] || "") === String(value || "")) sheet.deleteRow(i + 1);
+    }
+  }
+  function jsonResponse_(obj) {
+    return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
   }
   -->
 
   <script>
     const API_BASE = "https://www.googleapis.com/youtube/v3";
+    // ADMIN: Paste your Google Apps Script Web App URL below before deploying
+    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/YOUR_URL_HERE/exec";
     const YOUTUBE_API_KEYS = [
       // Team members add their YouTube API keys here
       // "AIzaSy...", // Aqeel
@@ -2052,6 +2217,8 @@
     const USER_ROLE_STORAGE = "yt_user_role";
     const ADMIN_PIN_STORAGE = "yt_admin_pin";
     const MEMBER_OWN_KEY_STORAGE = "yt_member_own_key";
+    const MEMBER_ACCESS_CODE_STORAGE = "yt_member_access_code";
+    const TEAM_MEMBERS_MANAGED_STORAGE = "yt_team_members_managed";
     const DEFAULT_ALERT_WINDOW_MS = 300000;
     const ALERT_WINDOW_OPTIONS = [60000, 120000, 180000, 240000, 300000];
     const ULTRA_CHECK_INTERVAL_MS = 30000;
@@ -2188,9 +2355,17 @@
     const newAdminPinInput = document.getElementById("newAdminPinInput");
     const confirmAdminPinInput = document.getElementById("confirmAdminPinInput");
     const changeAdminPinBtn = document.getElementById("changeAdminPinBtn");
+    const teamMembersManagementBody = document.getElementById("teamMembersManagementBody");
+    const newMemberNameInput = document.getElementById("newMemberNameInput");
+    const generatedAccessCodeDisplay = document.getElementById("generatedAccessCodeDisplay");
+    const generateAccessCodeBtn = document.getElementById("generateAccessCodeBtn");
+    const addTeamMemberBtn = document.getElementById("addTeamMemberBtn");
     const roleModal = document.getElementById("roleModal");
-    const roleSelectAdmin = document.getElementById("roleSelectAdmin");
-    const roleSelectMember = document.getElementById("roleSelectMember");
+    const adminPinInput = document.getElementById("adminPinInput");
+    const loginAsAdminBtn = document.getElementById("loginAsAdminBtn");
+    const accessCodeInput = document.getElementById("accessCodeInput");
+    const loginAsMemberBtn = document.getElementById("loginAsMemberBtn");
+    const accessCodeError = document.getElementById("accessCodeError");
     const nicheCategoryCards = document.getElementById("nicheCategoryCards");
     const nicheSettings = document.getElementById("nicheSettings");
     const nicheSettingsToggle = document.getElementById("nicheSettingsToggle");
@@ -2274,6 +2449,8 @@
     let teamDashboardData = { members: [], channels: [], alerts: [] };
     let syncActivityEntries = [];
     let syncActivityFilterValue = "all";
+    let managedTeamMembers = [];
+    let pendingGeneratedAccessCode = "";
 
     const nicheCategories = [
       { id: 26, name: "Howto & Style", description: "Epoxy, cleaning, restoration, DIY, detailing", seedQuery: "how to" },
@@ -2285,9 +2462,9 @@
 
     const stopWords = new Set(["the","a","an","is","it","this","that","you","i","my","so","do","in","on","at","to","for","of","and","or","but","not","with","from","will","wont","dont","cant","how","what","why","when","where","who","most","very","just","more","before","after","watch","wait","until","part","vs","ft","like","get","got","go","going","make","making","made","see","look","take","new","try","ever","even","one","way","day","time","things","thing","every","never","first","last","best","worst","real","really","still","back","into","been","about","these","those","them","only","over","than","should","could","would","much","many","some","your","our","their","his","her","shorts","short","video","subscribe","viral","fyp","foryou","tiktok","youtube"]);
 
-    // Role modal buttons always available before initApp
-    roleSelectAdmin.addEventListener("click", handleRoleSelectAdmin);
-    roleSelectMember.addEventListener("click", handleRoleSelectMember);
+    // Role modal actions available before initApp
+    loginAsAdminBtn.addEventListener("click", loginAsAdmin);
+    loginAsMemberBtn.addEventListener("click", loginAsMember);
 
     function initApp() {
     applyRoleVisibility();
@@ -2385,6 +2562,9 @@
     clearSyncActivityBtn.addEventListener("click", clearSyncActivityLog);
     addApiKeyBtn.addEventListener("click", addManagedApiKey);
     apiKeyManagementBody.addEventListener("click", handleApiKeyManagementActions);
+    generateAccessCodeBtn.addEventListener("click", handleGenerateAccessCode);
+    addTeamMemberBtn.addEventListener("click", addManagedTeamMember);
+    teamMembersManagementBody.addEventListener("click", handleTeamMembersManagementActions);
     saveMemberOwnKeyBtn.addEventListener("click", handleSaveMemberOwnKey);
     removeMemberOwnKeyBtn.addEventListener("click", handleRemoveMemberOwnKey);
     changeAdminPinBtn.addEventListener("click", handleChangeAdminPin);
@@ -2405,6 +2585,10 @@
     renderAlertsPage();
     renderMemberProfileSettings();
     renderApiKeyManagementTable();
+    renderTeamMembersManagement();
+    if (isAdmin()) {
+      refreshManagedMembersFromSheet();
+    }
     renderMemberOwnKeySection();
     renderSyncActivityLog();
     updateGoogleSheetConnectionStatus();
@@ -4015,14 +4199,17 @@
 
     function renderMemberProfileSettings() {
       memberNameInput.value = memberProfile.name || "";
+      memberNameInput.readOnly = !isAdmin();
       memberIdInput.value = memberProfile.memberId || "";
       memberIdText.textContent = memberProfile.memberId || "-";
-      googleSheetUrlInput.value = memberProfile.googleSheetUrl || "";
+      googleSheetUrlInput.value = memberProfile.googleSheetUrl || getConfiguredSheetUrl() || "";
       autoSyncToggle.checked = !!memberProfile.autoSync;
     }
 
     function saveMemberProfileFromSettings() {
-      memberProfile.name = String(memberNameInput.value || "").trim();
+      if (isAdmin()) {
+        memberProfile.name = String(memberNameInput.value || "").trim();
+      }
       memberProfile.googleSheetUrl = String(googleSheetUrlInput.value || "").trim();
       memberProfile.autoSync = !!autoSyncToggle.checked;
       saveMemberProfile();
@@ -4828,7 +5015,7 @@
     }
 
     function getGoogleSheetEndpoint() {
-      return String(memberProfile.googleSheetUrl || googleSheetUrlInput.value || "").trim();
+      return String(memberProfile.googleSheetUrl || googleSheetUrlInput.value || getConfiguredSheetUrl() || "").trim();
     }
 
     function updateGoogleSheetConnectionStatus(connected = null) {
@@ -6346,15 +6533,52 @@
       return getUserRole() === "admin";
     }
 
+    function getConfiguredSheetUrl() {
+      const hardcoded = String(GOOGLE_SHEET_URL || "").trim();
+      if (hardcoded && !hardcoded.includes("YOUR_URL_HERE")) return hardcoded;
+      return "";
+    }
+
+    function getRegistrationSheetUrl() {
+      return getConfiguredSheetUrl() || String(localStorage.getItem(GOOGLE_SHEET_URL_STORAGE) || "").trim();
+    }
+
+    function showAccessCodeError(message) {
+      if (!accessCodeError) return;
+      accessCodeError.textContent = message || "Invalid Access Code. Contact your admin.";
+      accessCodeError.style.display = "";
+    }
+
+    function hideAccessCodeError() {
+      if (!accessCodeError) return;
+      accessCodeError.style.display = "none";
+    }
+
+    function normalizeMemberRow(raw) {
+      const accessCode = String(raw["Access Code"] || raw.accessCode || raw.code || "").trim().toUpperCase();
+      const name = String(raw["Name"] || raw.name || "").trim();
+      const status = String(raw["Status"] || raw.status || "pending").trim().toLowerCase();
+      const lastActive = String(raw["Last Active"] || raw.lastActive || "").trim();
+      return { name, accessCode, status, lastActive, memberId: `member_${accessCode}` };
+    }
+
+    async function validateMemberAccessCode(accessCode) {
+      const sheetUrl = getRegistrationSheetUrl();
+      if (!sheetUrl) throw new Error("Sheet URL not configured");
+      const response = await fetch(sheetUrl, { method: "GET" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json().catch(() => ({}));
+      const members = Array.isArray(data.members) ? data.members.map(normalizeMemberRow) : [];
+      return members.find((m) => m.accessCode === accessCode) || null;
+    }
+
     function applyRoleVisibility() {
       const admin = isAdmin();
-      // Team tab: admin only
       if (tabTeam) tabTeam.style.display = admin ? "" : "none";
-      // Settings sections
       if (adminOnlySettings) adminOnlySettings.style.display = admin ? "" : "none";
       if (memberOnlySettings) memberOnlySettings.style.display = admin ? "none" : "";
-      // Role label
       if (currentRoleDisplay) currentRoleDisplay.textContent = admin ? "Admin 🔑" : "Team Member 👤";
+      if (memberNameInput) memberNameInput.readOnly = !admin;
     }
 
     function showRoleModal() {
@@ -6365,69 +6589,294 @@
       if (roleModal) roleModal.style.display = "none";
     }
 
-    function checkRoleAndInit() {
+    async function checkRoleAndInit() {
       const role = getUserRole();
       if (!role) {
         showRoleModal();
-      } else {
-        initApp();
-      }
-    }
-
-    function handleRoleSelectAdmin() {
-      const existingPin = localStorage.getItem(ADMIN_PIN_STORAGE);
-      if (existingPin) {
-        const pin = prompt("Enter your admin PIN to continue:");
-        if (!pin) return;
-        if (pin !== existingPin) {
-          alert("Incorrect PIN. Try again.");
-          return;
-        }
-        localStorage.setItem(USER_ROLE_STORAGE, "admin");
-        hideRoleModal();
-        initApp();
-      } else {
-        const pin = prompt("Create a 4-digit admin PIN:");
-        if (!pin) return;
-        if (!/^\d{4}$/.test(pin)) {
-          alert("Please enter exactly 4 digits.");
-          return;
-        }
-        const pin2 = prompt("Confirm your 4-digit admin PIN:");
-        if (pin !== pin2) {
-          alert("PINs don't match. Try again.");
-          return;
-        }
-        localStorage.setItem(USER_ROLE_STORAGE, "admin");
-        localStorage.setItem(ADMIN_PIN_STORAGE, pin);
-        // Pre-fill name as Admin
-        const profileRaw = localStorage.getItem(MEMBER_PROFILE_STORAGE);
-        const profile = profileRaw ? JSON.parse(profileRaw) : {};
-        if (!profile.name) {
-          profile.name = "Admin";
-          if (!profile.memberId) profile.memberId = "admin_" + Math.random().toString(36).slice(2, 8);
-          localStorage.setItem(MEMBER_PROFILE_STORAGE, JSON.stringify(profile));
-        }
-        hideRoleModal();
-        initApp();
-      }
-    }
-
-    function handleRoleSelectMember() {
-      const name = prompt("Enter your name (shown in team dashboard):");
-      if (!name || !name.trim()) {
-        alert("Please enter your name.");
         return;
       }
-      localStorage.setItem(USER_ROLE_STORAGE, "member");
-      // Save name into member profile
-      const profileRaw = localStorage.getItem(MEMBER_PROFILE_STORAGE);
-      const profile = profileRaw ? JSON.parse(profileRaw) : {};
-      profile.name = name.trim();
-      if (!profile.memberId) profile.memberId = "member_" + Math.random().toString(36).slice(2, 8);
-      localStorage.setItem(MEMBER_PROFILE_STORAGE, JSON.stringify(profile));
+      if (role === "member") {
+        const accessCode = String(localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "").trim().toUpperCase();
+        if (!accessCode) {
+          localStorage.removeItem(USER_ROLE_STORAGE);
+          showRoleModal();
+          return;
+        }
+        try {
+          const member = await validateMemberAccessCode(accessCode);
+          if (!member) throw new Error("Invalid access code");
+          if (member.status === "blocked") throw new Error("Your access has been blocked.");
+          memberProfile.name = member.name || "Member";
+          memberProfile.memberId = member.memberId;
+          memberProfile.googleSheetUrl = getRegistrationSheetUrl();
+          saveMemberProfile();
+          hideRoleModal();
+          initApp();
+          return;
+        } catch (_) {
+          localStorage.removeItem(USER_ROLE_STORAGE);
+          localStorage.removeItem(MEMBER_ACCESS_CODE_STORAGE);
+          showRoleModal();
+          return;
+        }
+      }
+      if (role === "admin") {
+        const existingPin = localStorage.getItem(ADMIN_PIN_STORAGE);
+        if (!existingPin) {
+          localStorage.removeItem(USER_ROLE_STORAGE);
+          showRoleModal();
+          return;
+        }
+        hideRoleModal();
+        initApp();
+        return;
+      }
+      initApp();
+    }
+
+    async function loginAsAdmin() {
+      const enteredPin = String(adminPinInput.value || "").trim();
+      const existingPin = localStorage.getItem(ADMIN_PIN_STORAGE);
+      if (existingPin) {
+        if (enteredPin !== existingPin) {
+          showAccessCodeError("Incorrect admin PIN.");
+          return;
+        }
+        localStorage.setItem(USER_ROLE_STORAGE, "admin");
+        hideAccessCodeError();
+        hideRoleModal();
+        initApp();
+        return;
+      }
+
+      if (!/^\d{4}$/.test(enteredPin)) {
+        showAccessCodeError("Set a 4-digit admin PIN.");
+        return;
+      }
+
+      let setupUrl = String(getConfiguredSheetUrl() || "").trim();
+      if (!setupUrl) {
+        setupUrl = String(prompt("First-time admin setup: paste your Google Apps Script Web App URL") || "").trim();
+      }
+      if (!setupUrl) {
+        showAccessCodeError("Google Sheet URL is required for first setup.");
+        return;
+      }
+
+      localStorage.setItem(USER_ROLE_STORAGE, "admin");
+      localStorage.setItem(ADMIN_PIN_STORAGE, enteredPin);
+      safeSetLocalStorage(GOOGLE_SHEET_URL_STORAGE, setupUrl, "google sheet url");
+      memberProfile.name = memberProfile.name || "Admin";
+      memberProfile.memberId = memberProfile.memberId || (`admin_${Math.random().toString(36).slice(2, 8)}`);
+      memberProfile.googleSheetUrl = setupUrl;
+      saveMemberProfile();
+      hideAccessCodeError();
       hideRoleModal();
       initApp();
+    }
+
+    async function loginAsMember() {
+      hideAccessCodeError();
+      const accessCode = String(accessCodeInput.value || "").trim().toUpperCase();
+      if (!accessCode || accessCode.length !== 6) {
+        showAccessCodeError("Please enter a 6-character access code");
+        return;
+      }
+      try {
+        const member = await validateMemberAccessCode(accessCode);
+        if (!member) {
+          showAccessCodeError("Invalid Access Code. Contact your admin.");
+          return;
+        }
+        if (member.status === "blocked") {
+          showAccessCodeError("Your access has been blocked. Contact your admin.");
+          return;
+        }
+
+        localStorage.setItem(USER_ROLE_STORAGE, "member");
+        safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
+        memberProfile.name = member.name || "Member";
+        memberProfile.memberId = member.memberId;
+        memberProfile.googleSheetUrl = getRegistrationSheetUrl();
+        saveMemberProfile();
+
+        await postSheetAction(getRegistrationSheetUrl(), {
+          action: "update_member_status",
+          accessCode,
+          lastActive: new Date().toISOString(),
+          status: "active"
+        });
+
+        hideRoleModal();
+        initApp();
+        showToast(`Welcome, ${memberProfile.name}!`);
+      } catch (error) {
+        showAccessCodeError(error.message || "Connection error. Try again.");
+      }
+    }
+
+    function generateAccessCode() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let code = "";
+      for (let i = 0; i < 6; i += 1) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      return code;
+    }
+
+    function loadManagedTeamMembers() {
+      const raw = localStorage.getItem(TEAM_MEMBERS_MANAGED_STORAGE);
+      if (!raw) {
+        managedTeamMembers = [];
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        managedTeamMembers = Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        managedTeamMembers = [];
+      }
+    }
+
+    function saveManagedTeamMembers() {
+      safeSetLocalStorage(TEAM_MEMBERS_MANAGED_STORAGE, JSON.stringify(managedTeamMembers), "managed team members");
+    }
+
+    function handleGenerateAccessCode() {
+      const existing = new Set(managedTeamMembers.map((m) => String(m.accessCode || "").toUpperCase()));
+      let code = generateAccessCode();
+      let guard = 0;
+      while (existing.has(code) && guard < 20) {
+        code = generateAccessCode();
+        guard += 1;
+      }
+      pendingGeneratedAccessCode = code;
+      if (generatedAccessCodeDisplay) generatedAccessCodeDisplay.textContent = code;
+      copyToClipboard(code, "Access code");
+    }
+
+    function renderTeamMembersManagement() {
+      if (!teamMembersManagementBody) return;
+      loadManagedTeamMembers();
+      teamMembersManagementBody.innerHTML = "";
+      if (!managedTeamMembers.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="6" class="small-muted">No members added yet.</td>';
+        teamMembersManagementBody.appendChild(tr);
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      managedTeamMembers.forEach((member, idx) => {
+        const tr = document.createElement("tr");
+        const status = String(member.status || "pending").toLowerCase();
+        const statusIcon = status === "active" ? "✅ Active" : status === "blocked" ? "⛔ Blocked" : "🟡 Pending";
+        tr.innerHTML = `
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(member.name || "-")}</td>
+          <td><span class="code-display" style="display:inline-block;padding:4px 8px;">${escapeHtml(member.accessCode || "-")}</span></td>
+          <td>${statusIcon}</td>
+          <td>${escapeHtml(member.lastActive ? formatRelativeTime(member.lastActive) : "Never")}</td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" type="button" data-toggle-member-block="${escapeHtml(member.accessCode)}">${status === "blocked" ? "Unblock" : "Block"}</button>
+            <button class="btn btn-secondary" type="button" data-remove-member="${escapeHtml(member.accessCode)}">Remove</button>
+          </td>
+        `;
+        fragment.appendChild(tr);
+      });
+      teamMembersManagementBody.appendChild(fragment);
+    }
+
+    async function refreshManagedMembersFromSheet() {
+      try {
+        const endpoint = getRegistrationSheetUrl();
+        if (!endpoint) return;
+        const response = await fetch(endpoint, { method: "GET" });
+        if (!response.ok) return;
+        const data = await response.json().catch(() => ({}));
+        const rows = Array.isArray(data.members) ? data.members.map(normalizeMemberRow) : [];
+        const withCode = rows.filter((r) => r.accessCode);
+        if (!withCode.length) return;
+        managedTeamMembers = withCode.map((r) => ({
+          name: r.name,
+          accessCode: r.accessCode,
+          status: r.status || "pending",
+          lastActive: r.lastActive || "",
+          createdAt: r.createdAt || "",
+          createdBy: r.createdBy || "admin"
+        }));
+        saveManagedTeamMembers();
+        renderTeamMembersManagement();
+      } catch (_) {
+      }
+    }
+
+    async function addManagedTeamMember() {
+      if (!isAdmin()) return;
+      const name = String(newMemberNameInput.value || "").trim();
+      const accessCode = String(pendingGeneratedAccessCode || "").trim().toUpperCase();
+      if (!name) {
+        showToast("Enter member name.");
+        return;
+      }
+      if (!accessCode || accessCode.length !== 6) {
+        showToast("Generate a 6-character access code first.");
+        return;
+      }
+      const endpoint = getRegistrationSheetUrl();
+      if (!endpoint) {
+        showToast("Set Google Sheet URL first.");
+        return;
+      }
+
+      const row = {
+        name,
+        accessCode,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        createdBy: "admin",
+        lastActive: ""
+      };
+
+      await postSheetAction(endpoint, { action: "add_member", member: row });
+      managedTeamMembers.unshift(row);
+      saveManagedTeamMembers();
+      renderTeamMembersManagement();
+      newMemberNameInput.value = "";
+      pendingGeneratedAccessCode = "";
+      if (generatedAccessCodeDisplay) generatedAccessCodeDisplay.textContent = "-";
+      showToast("Member added. Share the access code privately.");
+    }
+
+    async function handleTeamMembersManagementActions(event) {
+      const removeBtn = event.target.closest("button[data-remove-member]");
+      if (removeBtn) {
+        const code = String(removeBtn.getAttribute("data-remove-member") || "").trim().toUpperCase();
+        if (!code) return;
+        if (!confirm("Remove this member?")) return;
+        await postSheetAction(getRegistrationSheetUrl(), { action: "remove_member", accessCode: code });
+        managedTeamMembers = managedTeamMembers.filter((m) => String(m.accessCode || "").toUpperCase() !== code);
+        saveManagedTeamMembers();
+        renderTeamMembersManagement();
+        showToast("Member removed.");
+        return;
+      }
+
+      const blockBtn = event.target.closest("button[data-toggle-member-block]");
+      if (blockBtn) {
+        const code = String(blockBtn.getAttribute("data-toggle-member-block") || "").trim().toUpperCase();
+        if (!code) return;
+        const member = managedTeamMembers.find((m) => String(m.accessCode || "").toUpperCase() === code);
+        if (!member) return;
+        const nextStatus = String(member.status || "pending").toLowerCase() === "blocked" ? "active" : "blocked";
+        await postSheetAction(getRegistrationSheetUrl(), {
+          action: "update_member_status",
+          accessCode: code,
+          status: nextStatus,
+          lastActive: member.lastActive || ""
+        });
+        member.status = nextStatus;
+        saveManagedTeamMembers();
+        renderTeamMembersManagement();
+        showToast(nextStatus === "blocked" ? "Member blocked." : "Member unblocked.");
+      }
     }
 
     function handleResetRole() {
@@ -6443,6 +6892,7 @@
       }
       if (!confirm("Reset your role? You'll need to set up again on next load. Continue?")) return;
       localStorage.removeItem(USER_ROLE_STORAGE);
+      localStorage.removeItem(MEMBER_ACCESS_CODE_STORAGE);
       showToast("Role reset. Reload the page to set up again.");
       location.reload();
     }
@@ -6513,7 +6963,6 @@
     function syncMemberOwnKeyToPool() {
       const data = getMemberOwnKeyData();
       const owner = memberProfile.name || "Member";
-      // Remove stale entries for this member before re-adding
       teamApiKeys = teamApiKeys.filter((item) => item.owner !== owner);
       if (data && data.key) {
         teamApiKeys.push({
