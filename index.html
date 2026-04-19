@@ -5342,35 +5342,62 @@
       return result;
     }
 
+    function getSyncIdentity() {
+      const accessCode = String(localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "").trim().toUpperCase();
+      const canonicalMemberId = accessCode ? `member_${accessCode}` : "";
+      const resolvedMemberId = canonicalMemberId
+        || String(localStorage.getItem("memberId") || "").trim()
+        || String(memberProfile.memberId || "").trim()
+        || generateMemberId();
+      const resolvedMemberName = String(localStorage.getItem("memberName") || memberProfile.name || "Unknown").trim() || "Unknown";
+
+      // Keep local and profile identity aligned with sync payloads.
+      localStorage.setItem("memberId", resolvedMemberId);
+      localStorage.setItem("memberName", resolvedMemberName);
+      memberProfile.memberId = resolvedMemberId;
+      memberProfile.name = resolvedMemberName;
+
+      return {
+        accessCode,
+        memberId: resolvedMemberId,
+        memberName: resolvedMemberName
+      };
+    }
+
     function buildMemberSyncPayload() {
+      const identity = getSyncIdentity();
       const trackedList = Object.values(trackedChannels);
       const nicheSet = new Set(trackedList.map((ch) => normalizeNicheTag(ch.nicheKeyword)).filter(Boolean));
-      const alertsToday = alertHistory.filter((item) => isToday(item.detectedAt || item.timestamp || "")).length;
+      const alertsToday = alertHistory.filter((item) => isToday(item.timestamp || item.detectedAt || "")).length;
+      const currentAPIKey = getConfiguredAPIKeys()[0]?.key || "";
       return {
         action: "sync_member",
         memberData: {
-          accessCode: localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "",
-          memberId: memberProfile.memberId || generateMemberId(),
-          name: memberProfile.name || "Unknown",
-          apiKey: getConfiguredAPIKeys()[0]?.key || "",
+          memberId: identity.memberId,
+          accessCode: identity.accessCode,
+          name: identity.memberName,
+          lastActive: new Date().toISOString(),
+          status: "active",
+          apiKeyMasked: currentAPIKey ? `${currentAPIKey.substring(0, 8)}...` : "",
+          apiKey: currentAPIKey,
           trackedChannelsCount: trackedList.length,
           nichesTracking: Array.from(nicheSet).join(", "),
-          lastActive: new Date().toISOString(),
           alertsToday
         }
       };
     }
 
     function buildChannelsSyncPayload() {
+      const identity = getSyncIdentity();
       return {
         action: "sync_channels",
-        memberId: memberProfile.memberId,
-        memberName: memberProfile.name || "Unknown",
+        memberId: identity.memberId,
+        memberName: identity.memberName,
         channels: Object.values(trackedChannels).map((ch) => ({
           channelTitle: ch.channelTitle || "",
           channelId: ch.channelId || "",
           subscriberCount: Number(ch.subscriberCount || 0),
-          nicheKeyword: normalizeNicheTag(ch.nicheKeyword || "Uncategorized"),
+          nicheKeyword: ch.nicheKeyword || "",
           dateAdded: ch.dateAdded || "",
           lastChecked: ch.lastChecked || ""
         }))
@@ -5378,10 +5405,11 @@
     }
 
     function buildAlertsSyncPayload() {
+      const identity = getSyncIdentity();
       return {
         action: "sync_alerts",
-        memberId: memberProfile.memberId,
-        memberName: memberProfile.name || "Unknown",
+        memberId: identity.memberId,
+        memberName: identity.memberName,
         alerts: alertHistory.slice(0, 100).map((item) => ({
           timestamp: item.detectedAt || "",
           channelTitle: item.channelTitle || "",
@@ -5410,7 +5438,9 @@
       }
       try {
         memberProfile.googleSheetUrl = endpoint;
-        if (!memberProfile.memberId) memberProfile.memberId = generateMemberId();
+        const identity = getSyncIdentity();
+        memberProfile.memberId = identity.memberId;
+        memberProfile.name = identity.memberName;
         saveMemberProfile();
         if (teamDashboardStatus) teamDashboardStatus.textContent = "Syncing to Google Sheets...";
 
@@ -7008,7 +7038,9 @@
           memberProfile.name = member.name || "Member";
           memberProfile.memberId = member.memberId;
           memberProfile.googleSheetUrl = getRegistrationSheetUrl();
+          localStorage.setItem("memberId", member.memberId || `member_${accessCode}`);
           localStorage.setItem("memberName", memberProfile.name || "Member");
+          localStorage.setItem("accessCode", accessCode);
           localStorage.setItem(MEMBER_SLACK_WEBHOOK_STORAGE, String(member.slackWebhookUrl || ""));
           saveMemberProfile();
           hideRoleModal();
