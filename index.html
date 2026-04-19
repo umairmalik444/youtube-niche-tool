@@ -1996,8 +1996,7 @@
   <!--
   Google Apps Script (copy into Extensions > Apps Script in your Google Sheet):
   const SHEETS = {
-    Members: ["memberId", "name", "role", "apiKeyMasked", "trackedChannelsCount", "nichesTracking", "lastActive", "alertsToday"],
-    TeamMembers: ["Name", "Access Code", "Status", "Created At", "Created By", "Last Active"],
+    Members: ["Name", "Access Code", "Status", "Created At", "Created By", "Last Active", "Member ID", "Role", "API Key Masked", "Tracked Channels", "Niches", "Alerts Today"],
     TrackedChannels: ["memberId", "memberName", "channelTitle", "channelId", "subscriberCount", "nicheKeyword", "dateAdded", "lastChecked"],
     Alerts: ["memberId", "memberName", "timestamp", "channelTitle", "videoTitle", "videoId", "niche"],
     APIKeys: ["memberId", "memberName", "apiKeyMasked", "addedAt", "status"]
@@ -2007,7 +2006,7 @@
     ensureAllSheets_();
     return jsonResponse_({
       ok: true,
-      members: readSheetAsObjects_("TeamMembers"),
+      members: readSheetAsObjects_("Members"),
       channels: readSheetAsObjects_("TrackedChannels"),
       alerts: readSheetAsObjects_("Alerts"),
       apiKeys: readSheetAsObjects_("APIKeys")
@@ -2115,19 +2114,25 @@
   function handleAddMember_(data) {
     const m = data.member || {};
     const code = String(m.accessCode || "").toUpperCase();
-    upsertByCol_(ensureSheet_("TeamMembers", SHEETS.TeamMembers), 2, code, [
+    upsertByCol_(ensureSheet_("Members", SHEETS.Members), 2, code, [
       String(m.name || ""),
       code,
       String(m.status || "pending"),
       String(m.createdAt || new Date().toISOString()),
       String(m.createdBy || "admin"),
-      String(m.lastActive || "")
+      String(m.lastActive || ""),
+      String(m.memberId || ""),
+      String(m.role || "member"),
+      String(m.apiKeyMasked || ""),
+      Number(m.trackedChannelsCount || 0),
+      String(m.nichesTracking || ""),
+      Number(m.alertsToday || 0)
     ]);
     return jsonResponse_({ success: true });
   }
 
   function handleGetMembers_(data) {
-    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const sheet = ensureSheet_("Members", SHEETS.Members);
     const rows = sheet.getDataRange().getValues();
     if (rows.length <= 1) return jsonResponse_({ members: [] });
     const headers = rows[0] || [];
@@ -2145,7 +2150,7 @@
     const code = String(data.accessCode || "").trim().toUpperCase();
     if (!code) return jsonResponse_({ success: false, message: "accessCode required" });
 
-    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const sheet = ensureSheet_("Members", SHEETS.Members);
     const rows = sheet.getDataRange().getValues();
     const headers = rows[0] || [];
     const accessCodeCol = headers.indexOf("Access Code");
@@ -2170,7 +2175,7 @@
 
   function handleRemoveMember_(data) {
     const code = String(data.accessCode || "").toUpperCase();
-    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const sheet = ensureSheet_("Members", SHEETS.Members);
     const rows = sheet.getDataRange().getValues();
     for (var i = rows.length - 1; i >= 1; i--) {
       if (String(rows[i][1] || "").toUpperCase() === code) {
@@ -2185,7 +2190,7 @@
     const code = String(data.accessCode || "").trim().toUpperCase();
     if (!code) return jsonResponse_({ success: false, message: "Access code required" });
 
-    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const sheet = ensureSheet_("Members", SHEETS.Members);
     const rows = sheet.getDataRange().getValues();
     const headers = rows[0] || [];
     const codeCol = headers.indexOf("Access Code");
@@ -5222,12 +5227,10 @@
         showToast("✅ Connected");
       } catch (error) {
         try {
-          await fetch(endpoint, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({ action: "test" })
-          });
+          const result = await postToSheet({ action: "test" }, endpoint);
+          if (!result || (!result.success && !result.ok)) {
+            throw new Error(result?.error || "POST test failed");
+          }
 
           updateGoogleSheetConnectionStatus(true);
           addSyncActivityEntry("test_connection", "success", "Connection verified via POST.");
@@ -5263,15 +5266,41 @@
       }, 2000);
     }
 
+    async function postToSheet(data, endpointOverride) {
+      const sheetUrl = String(endpointOverride || GOOGLE_SHEET_URL || localStorage.getItem("googleSheetUrl") || getGoogleSheetEndpoint() || "").trim();
+      if (!sheetUrl) return { success: false, error: "No sheet URL" };
+
+      try {
+        const response = await fetch(sheetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify(data),
+          redirect: "follow"
+        });
+        const body = await response.json().catch(() => ({}));
+        if (response.ok) return body;
+        return { success: false, error: body?.error || `HTTP ${response.status}` };
+      } catch (error) {
+        try {
+          await fetch(sheetUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify(data)
+          });
+          return { success: true, fallback: true };
+        } catch (fallbackError) {
+          return { success: false, error: fallbackError.message || error.message || "POST failed" };
+        }
+      }
+    }
+
     async function postSheetAction(endpoint, payload) {
-      await fetch(endpoint, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
-      });
-      // no-cors returns an opaque response; assume success if no exception thrown
-      return { ok: true };
+      const result = await postToSheet(payload, endpoint);
+      if (!result || (result.success === false && result.ok !== true)) {
+        throw new Error(result?.error || "Google Sheet POST failed");
+      }
+      return result;
     }
 
     function buildMemberSyncPayload() {
@@ -6671,13 +6700,14 @@
     async function validateMemberAccessCode(accessCode) {
       const sheetUrl = getRegistrationSheetUrl();
       if (!sheetUrl) throw new Error("Sheet URL not configured");
-      const response = await fetch(sheetUrl, {
-        method: "GET",
-        redirect: "follow"
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json().catch(() => ({}));
-      const members = Array.isArray(data.members) ? data.members.map(normalizeMemberRow) : [];
+
+      const result = await postToSheet({ action: "validate_access_code", accessCode }, sheetUrl);
+      if (result && result.member) {
+        return normalizeMemberRow(result.member);
+      }
+
+      const membersResult = await postToSheet({ action: "get_members" }, sheetUrl);
+      const members = Array.isArray(membersResult?.members) ? membersResult.members.map(normalizeMemberRow) : [];
       const code = String(accessCode || "").trim().toUpperCase();
       return members.find((m) => m.accessCode === code) || null;
     }
@@ -6826,54 +6856,18 @@
         memberProfile.googleSheetUrl = GOOGLE_SHEET_URL;
         saveMemberProfile();
 
-        try {
-          await fetch(GOOGLE_SHEET_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-              action: "update_member_status",
-              accessCode,
-              lastActive: new Date().toISOString(),
-              status: "active"
-            })
-          });
-        } catch (_) {
-        }
+        await postToSheet({
+          action: "update_member_status",
+          accessCode,
+          lastActive: new Date().toISOString(),
+          status: "active"
+        }, GOOGLE_SHEET_URL);
 
         hideRoleModal();
         initApp();
         showToast(`Welcome, ${memberProfile.name}!`);
       } catch (error) {
-        try {
-          await fetch(GOOGLE_SHEET_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify({
-              action: "validate_access_code_nocors",
-              accessCode: accessCode
-            })
-          });
-
-          localStorage.setItem(USER_ROLE_STORAGE, "member");
-          localStorage.setItem("userRole", "member");
-          localStorage.setItem("memberName", "Team Member");
-          localStorage.setItem("memberId", `member_${accessCode}`);
-          localStorage.setItem("accessCode", accessCode);
-          localStorage.setItem("googleSheetUrl", GOOGLE_SHEET_URL);
-          safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
-          memberProfile.name = "Team Member";
-          memberProfile.memberId = `member_${accessCode}`;
-          memberProfile.googleSheetUrl = GOOGLE_SHEET_URL;
-          saveMemberProfile();
-
-          hideRoleModal();
-          initApp();
-          showToast("Welcome! Your profile will sync shortly.");
-        } catch (_) {
-          showAccessCodeError("Connection error. Check internet and try again.");
-        }
+        showAccessCodeError(error?.message || "Connection error. Check internet and try again.");
       } finally {
         memberJoinBtn.disabled = false;
         memberJoinBtn.textContent = "Join";
@@ -6953,40 +6947,11 @@
       const endpoint = getRegistrationSheetUrl();
       if (!endpoint) return;
 
-      // Prefer POST get_members to avoid redirect/CORS issues on some deployments.
       try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "get_members" }),
-          redirect: "follow"
-        });
-        if (response.ok) {
-          const data = await response.json().catch(() => ({}));
-          const rows = Array.isArray(data.members) ? data.members.map(normalizeMemberRow) : [];
-          const withCode = rows.filter((r) => r.accessCode);
-          managedTeamMembers = withCode.map((r) => ({
-            name: r.name,
-            accessCode: r.accessCode,
-            status: r.status || "pending",
-            lastActive: r.lastActive || "",
-            createdAt: r.createdAt || "",
-            createdBy: r.createdBy || "admin"
-          }));
-          saveManagedTeamMembers();
-          renderTeamMembersManagement();
-          return;
-        }
-      } catch (_) {
-      }
-
-      // Fallback: plain GET doGet if POST read path isn't available yet.
-      try {
-        const response = await fetch(endpoint, { method: "GET", redirect: "follow" });
-        if (!response.ok) return;
-        const data = await response.json().catch(() => ({}));
-        const rows = Array.isArray(data.members) ? data.members.map(normalizeMemberRow) : [];
+        const data = await postToSheet({ action: "get_members" }, endpoint);
+        const rows = Array.isArray(data?.members) ? data.members.map(normalizeMemberRow) : [];
         const withCode = rows.filter((r) => r.accessCode);
+        if (!withCode.length) return;
         managedTeamMembers = withCode.map((r) => ({
           name: r.name,
           accessCode: r.accessCode,
@@ -7070,12 +7035,18 @@
         const member = managedTeamMembers.find((m) => String(m.accessCode || "").toUpperCase() === code);
         if (!member) return;
         const nextStatus = String(member.status || "pending").toLowerCase() === "blocked" ? "active" : "blocked";
-        await postSheetAction(getRegistrationSheetUrl(), {
-          action: "update_member_status",
-          accessCode: code,
-          status: nextStatus,
-          lastActive: member.lastActive || ""
-        });
+        await postSheetAction(getRegistrationSheetUrl(), nextStatus === "blocked"
+          ? {
+              action: "block_member",
+              accessCode: code,
+              lastActive: member.lastActive || ""
+            }
+          : {
+              action: "update_member_status",
+              accessCode: code,
+              status: "active",
+              lastActive: member.lastActive || ""
+            });
         member.status = nextStatus;
         saveManagedTeamMembers();
         renderTeamMembersManagement();
