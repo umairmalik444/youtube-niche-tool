@@ -5349,6 +5349,7 @@
       return {
         action: "sync_member",
         memberData: {
+          accessCode: localStorage.getItem("accessCode") || localStorage.getItem(MEMBER_ACCESS_CODE_STORAGE) || "",
           memberId: memberProfile.memberId || generateMemberId(),
           name: memberProfile.name || "Unknown",
           apiKey: getConfiguredAPIKeys()[0]?.key || "",
