@@ -2262,7 +2262,7 @@
     // This URL is used by all team members to validate access codes
     // Get this from: Google Sheet > Extensions > Apps Script > Deploy > Web App URL
     // ============================================
-    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzYiUECjZY0vEmP_3dO-SX_TBob806P9O2lccbCrkIGmN2fTPu2FTfYn7JTKZzvQeM1Gw/exec";
+    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzdBrHFj2T-hX_Ij0AbrMAHMbhnpv2SOdR77XnuwnxRkmX9zKjh6-bbPr-CvErZZXk0/exec";
     const YOUTUBE_API_KEYS = [
       // Team members add their YouTube API keys here
       // "AIzaSy...", // Aqeel
@@ -6690,10 +6690,23 @@
     }
 
     function normalizeMemberRow(raw) {
-      const accessCode = String(raw["Access Code"] || raw.accessCode || raw.code || "").trim().toUpperCase();
-      const name = String(raw["Name"] || raw.name || "").trim();
-      const status = String(raw["Status"] || raw.status || "pending").trim().toLowerCase();
-      const lastActive = String(raw["Last Active"] || raw.lastActive || "").trim();
+      const source = raw || {};
+      const keyMap = {};
+      Object.keys(source).forEach((k) => {
+        keyMap[String(k).toLowerCase().replace(/[_\s]/g, "")] = source[k];
+      });
+      const accessCode = String(
+        source["Access Code"] || source.accessCode || source.code || keyMap.accesscode || keyMap.code || keyMap.access || ""
+      ).trim().toUpperCase();
+      const name = String(
+        source["Name"] || source.name || source.memberName || keyMap.name || keyMap.membername || keyMap.displayname || ""
+      ).trim();
+      const status = String(
+        source["Status"] || source.status || keyMap.status || "pending"
+      ).trim().toLowerCase();
+      const lastActive = String(
+        source["Last Active"] || source.lastActive || keyMap.lastactive || ""
+      ).trim();
       return { name, accessCode, status, lastActive, memberId: `member_${accessCode}` };
     }
 
@@ -6702,14 +6715,20 @@
       if (!sheetUrl) throw new Error("Sheet URL not configured");
 
       const result = await postToSheet({ action: "validate_access_code", accessCode }, sheetUrl);
-      if (result && result.member) {
+      if (result && result.success && result.member) {
         return normalizeMemberRow(result.member);
       }
 
       const membersResult = await postToSheet({ action: "get_members" }, sheetUrl);
       const members = Array.isArray(membersResult?.members) ? membersResult.members.map(normalizeMemberRow) : [];
       const code = String(accessCode || "").trim().toUpperCase();
-      return members.find((m) => m.accessCode === code) || null;
+      const matched = members.find((m) => m.accessCode === code) || null;
+      if (matched) return matched;
+
+      if (result && result.success === false && result.message) {
+        throw new Error(String(result.message));
+      }
+      return null;
     }
 
     function applyRoleVisibility() {
@@ -6839,19 +6858,21 @@
           showAccessCodeError("Invalid Access Code. Contact your admin.");
           return;
         }
-        if (member.status === "blocked") {
+        const memberName = member.name || "Team Member";
+        const memberStatus = String(member.status || "active").toLowerCase();
+        if (memberStatus === "blocked") {
           showAccessCodeError("Your access has been blocked. Contact your admin.");
           return;
         }
 
         localStorage.setItem(USER_ROLE_STORAGE, "member");
         localStorage.setItem("userRole", "member");
-        localStorage.setItem("memberName", member.name || "Team Member");
+        localStorage.setItem("memberName", memberName);
         localStorage.setItem("memberId", `member_${accessCode}`);
         localStorage.setItem("accessCode", accessCode);
         localStorage.setItem("googleSheetUrl", GOOGLE_SHEET_URL);
         safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
-        memberProfile.name = member.name || "Member";
+        memberProfile.name = memberName;
         memberProfile.memberId = `member_${accessCode}`;
         memberProfile.googleSheetUrl = GOOGLE_SHEET_URL;
         saveMemberProfile();
