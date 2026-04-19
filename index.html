@@ -5700,52 +5700,22 @@
     }
 
     async function registerServiceWorker() {
-      if (!("serviceWorker" in navigator)) return null;
-      if (!window.isSecureContext) {
-        console.warn("Service worker requires HTTPS or localhost.");
+      if (!("serviceWorker" in navigator)) {
+        console.log("Service Workers not supported");
         return null;
       }
+
       if (serviceWorkerRegistration) return serviceWorkerRegistration;
+
       try {
-        serviceWorkerRegistration = await navigator.serviceWorker.register("./sw.js");
+        serviceWorkerRegistration = await navigator.serviceWorker.register("sw.js");
         window.swRegistration = serviceWorkerRegistration;
-        console.log("✅ Service Worker registered");
+        console.log("✅ Service Worker registered:", serviceWorkerRegistration.scope);
         return serviceWorkerRegistration;
       } catch (error) {
-        console.warn("Service worker registration failed:", error);
+        console.log("SW registration failed:", error.message);
         return null;
       }
-    }
-
-    async function getReadyServiceWorker() {
-      const registration = await registerServiceWorker();
-      if (registration) return registration;
-      try {
-        const existing = await navigator.serviceWorker.getRegistration();
-        if (existing) {
-          serviceWorkerRegistration = existing;
-          window.swRegistration = existing;
-          return existing;
-        }
-      } catch (error) {
-        console.warn("Service worker lookup failed:", error);
-      }
-      return null;
-    }
-
-    async function showNotificationViaSW(title, body, extraOptions = {}) {
-      const registration = await getReadyServiceWorker();
-      if (!registration) {
-        throw new Error("Service Worker unavailable. Open via HTTPS (or localhost) and reload.");
-      }
-      const options = {
-        body,
-        icon: "https://www.youtube.com/favicon.ico",
-        badge: "https://www.youtube.com/favicon.ico",
-        vibrate: [200, 100, 200],
-        ...extraOptions
-      };
-      await registration.showNotification(title, options);
     }
 
     async function subscribeToWebPush() {
@@ -5850,14 +5820,15 @@
         showToast("This browser does not support notifications");
         return;
       }
-      if (!window.isSecureContext) {
-        showToast("Notifications need HTTPS (or localhost). Open the secure URL and try again.");
-        return;
-      }
 
       if (Notification.permission === "granted") {
         try {
-          await showNotificationViaSW("🔔 Test Notification", "Notifications are working!");
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification("🔔 Test Notification", {
+            body: "Notifications are working!",
+            icon: "https://www.youtube.com/favicon.ico",
+            vibrate: [200, 100, 200]
+          });
           showToast("✅ Notifications already active - test sent!");
         } catch (error) {
           showToast(`Error sending test notification: ${error.message}`);
@@ -5877,7 +5848,12 @@
         const permission = await Notification.requestPermission();
         updateNotificationBadge();
         if (permission === "granted") {
-          await showNotificationViaSW("🔔 Notifications Enabled!", "You will now receive alerts for new videos");
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification("🔔 Notifications Enabled!", {
+            body: "You will now receive alerts for new videos",
+            icon: "https://www.youtube.com/favicon.ico",
+            vibrate: [200, 100, 200]
+          });
           await subscribeToWebPush();
           showToast("✅ Notifications enabled!");
         } else {
@@ -5937,39 +5913,37 @@
     async function sendPushNotification(channelTitle, videoTitle) {
       if (!("Notification" in window)) return;
       if (Notification.permission !== "granted") return;
-      if (!window.isSecureContext) return;
-
-      const title = "🎯 New Video Alert!";
-      const body = `${channelTitle}: ${videoTitle}`;
 
       try {
-        await showNotificationViaSW(title, body, {
+        const registration = await navigator.serviceWorker.ready;
+        await registration.showNotification("🎯 New Video Alert!", {
+          body: `${channelTitle}: ${videoTitle}`,
+          icon: "https://www.youtube.com/favicon.ico",
+          vibrate: [200, 100, 200],
           tag: `yt-alert-${Date.now()}`,
           requireInteraction: true
         });
-        console.log("✅ Notification sent via Service Worker");
+        console.log("✅ Notification sent");
       } catch (error) {
-        console.error("Service Worker notification failed:", error);
+        console.error("Notification error:", error);
       }
     }
 
     async function testNotification() {
-      if (!("Notification" in window) || Notification.permission !== "granted") {
-        showToast("Enable notifications first by clicking the badge in header");
-        return;
-      }
-      if (!window.isSecureContext) {
-        showToast("Open this app on HTTPS (or localhost) to test notifications.");
+      if (Notification.permission !== "granted") {
+        showToast("Enable notifications first");
         return;
       }
       try {
-        await showNotificationViaSW("🔔 Test Notification", "Notifications are working!", {
-          tag: `yt-test-${Date.now()}`,
-          requireInteraction: true
+        const registration = await navigator.serviceWorker.ready;
+        await registration.showNotification("🔔 Test Notification", {
+          body: "Notifications are working!",
+          icon: "https://www.youtube.com/favicon.ico",
+          vibrate: [200, 100, 200]
         });
         showToast("✅ Test notification sent!");
       } catch (error) {
-        showToast(`Error: ${error.message}`);
+        showToast("Error: " + error.message);
         console.error("Test notification error:", error);
       }
     }
