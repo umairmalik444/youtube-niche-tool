@@ -1155,6 +1155,70 @@
         display: none;
       }
     }
+
+    /* Role selection modal */
+    .role-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(7, 11, 16, 0.97);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .role-modal-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 440px;
+      width: 90%;
+      box-shadow: var(--shadow);
+      gap: 8px;
+    }
+
+    .role-modal-card h2 {
+      color: var(--text);
+      margin: 0 0 6px;
+      font-size: 1.4rem;
+      text-align: center;
+    }
+
+    .role-modal-card p {
+      color: var(--muted);
+      margin: 0 0 20px;
+      text-align: center;
+    }
+
+    .role-btn-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .role-btn {
+      height: 52px;
+      font-size: 1rem;
+      border-radius: 12px;
+      min-width: unset;
+      width: 100%;
+    }
+
+    .role-btn-member {
+      background: var(--card-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
   </style>
 </head>
 <body>
@@ -1682,15 +1746,17 @@
     </section>
 
     <section id="settingsSection" class="app-section">
+
+      <!-- SHARED: My Profile -->
       <section class="tracker-card" style="margin-top: 12px;">
-        <h3>Member Profile</h3>
+        <h3>My Profile</h3>
         <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
           <div>
-            <label for="memberNameInput">Member Name</label>
+            <label for="memberNameInput">Display Name</label>
             <input id="memberNameInput" type="text" placeholder="e.g. Aqeel" />
           </div>
           <div>
-            <label for="memberIdInput">Member ID</label>
+            <label>Member ID</label>
             <input id="memberIdInput" type="text" readonly />
             <div class="small-muted">Your ID: <strong id="memberIdText">-</strong></div>
           </div>
@@ -1700,6 +1766,7 @@
         </div>
       </section>
 
+      <!-- SHARED: Google Sheets Connection -->
       <section class="tracker-card" style="margin-top: 12px;">
         <h3>Google Sheets Connection</h3>
         <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
@@ -1720,6 +1787,7 @@
         </div>
       </section>
 
+      <!-- SHARED: Sync Activity Log -->
       <section class="tracker-card" style="margin-top: 12px;">
         <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span>Sync Activity Log (<span id="syncActivityCount">0</span>)</span>
@@ -1739,39 +1807,105 @@
         </div>
       </section>
 
-      <section class="tracker-card" style="margin-top: 12px;">
-        <h3>API Key Management</h3>
-        <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
-          <div>
-            <label for="newApiKeyInput">Add New API Key</label>
-            <input id="newApiKeyInput" type="password" placeholder="AIzaSy..." autocomplete="off" />
+      <!-- ADMIN ONLY -->
+      <div id="adminOnlySettings">
+        <section class="tracker-card" style="margin-top: 12px;">
+          <h3>API Key Management (All Members)</h3>
+          <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+            <div>
+              <label for="newApiKeyInput">Add API Key</label>
+              <input id="newApiKeyInput" type="password" placeholder="AIzaSy..." autocomplete="off" />
+            </div>
+            <div>
+              <label for="newApiKeyOwnerInput">Key Owner Name</label>
+              <input id="newApiKeyOwnerInput" type="text" placeholder="Owner name" />
+            </div>
+            <div style="align-self:end;">
+              <button id="addApiKeyBtn" class="btn" type="button">Add Key</button>
+            </div>
           </div>
-          <div>
-            <label for="newApiKeyOwnerInput">Key Owner Name</label>
-            <input id="newApiKeyOwnerInput" type="text" placeholder="Owner name" />
+          <div class="table-wrap" style="padding: 0 12px 12px 12px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>API Key (masked)</th>
+                  <th>Added By</th>
+                  <th>Status</th>
+                  <th>Quota Used</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="apiKeyManagementBody"></tbody>
+            </table>
           </div>
-          <div style="align-self:end;">
-            <button id="addApiKeyBtn" class="btn" type="button">Add Key</button>
+        </section>
+
+        <section class="tracker-card" style="margin-top: 12px;">
+          <h3>Change Admin PIN</h3>
+          <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+            <div>
+              <label for="newAdminPinInput">New PIN (4 digits)</label>
+              <input id="newAdminPinInput" type="password" maxlength="4" placeholder="••••" autocomplete="off" />
+            </div>
+            <div>
+              <label for="confirmAdminPinInput">Confirm New PIN</label>
+              <input id="confirmAdminPinInput" type="password" maxlength="4" placeholder="••••" autocomplete="off" />
+            </div>
+            <div style="align-self:end;">
+              <button id="changeAdminPinBtn" class="btn btn-secondary" type="button">Change PIN</button>
+            </div>
           </div>
-        </div>
-        <div class="table-wrap" style="padding: 0 12px 12px 12px;">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>API Key (masked)</th>
-                <th>Added By</th>
-                <th>Status</th>
-                <th>Quota Used</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="apiKeyManagementBody"></tbody>
-          </table>
+        </section>
+      </div>
+
+      <!-- MEMBER ONLY -->
+      <div id="memberOnlySettings">
+        <section class="tracker-card" style="margin-top: 12px;">
+          <h3>Your API Key</h3>
+          <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+            <div>
+              <label for="memberOwnKeyInput">Your YouTube API Key</label>
+              <input id="memberOwnKeyInput" type="password" placeholder="AIzaSy..." autocomplete="off" />
+            </div>
+            <div style="align-self:center;">
+              <div class="small-muted">Owner: <strong id="memberOwnKeyOwnerDisplay">-</strong></div>
+            </div>
+            <div style="align-self:end;">
+              <button id="saveMemberOwnKeyBtn" class="btn" type="button">Save My Key</button>
+            </div>
+          </div>
+          <div id="memberOwnKeySavedWrap" style="padding: 0 12px 12px 12px; display:none;">
+            <div class="small-muted" id="memberOwnKeySavedDisplay"></div>
+            <button id="removeMemberOwnKeyBtn" class="btn btn-secondary" style="margin-top:8px;" type="button">Remove My Key</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- SHARED: Role & Reset -->
+      <section class="tracker-card" style="margin-top: 12px; margin-bottom: 24px;">
+        <h3>Role</h3>
+        <div style="padding:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div class="small-muted">Current role: <strong id="currentRoleDisplay">-</strong></div>
+          <button id="resetRoleBtn" class="btn btn-secondary" type="button">Reset My Role</button>
         </div>
       </section>
+
     </section>
   </main>
+
+  <!-- Role Selection Modal -->
+  <div id="roleModal" class="role-modal" style="display:none;">
+    <div class="role-modal-card">
+      <div style="font-size:3rem;">🎯</div>
+      <h2>YouTube Niche Discovery Tool</h2>
+      <p>Select your role to continue:</p>
+      <div class="role-btn-wrap">
+        <button id="roleSelectAdmin" class="btn role-btn" type="button">🔑 I'm the Admin</button>
+        <button id="roleSelectMember" class="btn role-btn role-btn-member" type="button">👤 I'm a Team Member</button>
+      </div>
+    </div>
+  </div>
 
   <!--
   Google Apps Script (copy into Extensions > Apps Script in your Google Sheet):
@@ -1915,6 +2049,9 @@
     const AUTO_SYNC_STORAGE = "yt_auto_sync_enabled";
     const SYNC_ACTIVITY_LOG_STORAGE = "yt_sync_activity_log";
     const LAST_SYNC_ALERT_TS_STORAGE = "yt_last_sync_alert_ts";
+    const USER_ROLE_STORAGE = "yt_user_role";
+    const ADMIN_PIN_STORAGE = "yt_admin_pin";
+    const MEMBER_OWN_KEY_STORAGE = "yt_member_own_key";
     const DEFAULT_ALERT_WINDOW_MS = 300000;
     const ALERT_WINDOW_OPTIONS = [60000, 120000, 180000, 240000, 300000];
     const ULTRA_CHECK_INTERVAL_MS = 30000;
@@ -2038,6 +2175,22 @@
     const newApiKeyOwnerInput = document.getElementById("newApiKeyOwnerInput");
     const addApiKeyBtn = document.getElementById("addApiKeyBtn");
     const apiKeyManagementBody = document.getElementById("apiKeyManagementBody");
+    const adminOnlySettings = document.getElementById("adminOnlySettings");
+    const memberOnlySettings = document.getElementById("memberOnlySettings");
+    const currentRoleDisplay = document.getElementById("currentRoleDisplay");
+    const resetRoleBtn = document.getElementById("resetRoleBtn");
+    const memberOwnKeyInput = document.getElementById("memberOwnKeyInput");
+    const memberOwnKeyOwnerDisplay = document.getElementById("memberOwnKeyOwnerDisplay");
+    const saveMemberOwnKeyBtn = document.getElementById("saveMemberOwnKeyBtn");
+    const removeMemberOwnKeyBtn = document.getElementById("removeMemberOwnKeyBtn");
+    const memberOwnKeySavedWrap = document.getElementById("memberOwnKeySavedWrap");
+    const memberOwnKeySavedDisplay = document.getElementById("memberOwnKeySavedDisplay");
+    const newAdminPinInput = document.getElementById("newAdminPinInput");
+    const confirmAdminPinInput = document.getElementById("confirmAdminPinInput");
+    const changeAdminPinBtn = document.getElementById("changeAdminPinBtn");
+    const roleModal = document.getElementById("roleModal");
+    const roleSelectAdmin = document.getElementById("roleSelectAdmin");
+    const roleSelectMember = document.getElementById("roleSelectMember");
     const nicheCategoryCards = document.getElementById("nicheCategoryCards");
     const nicheSettings = document.getElementById("nicheSettings");
     const nicheSettingsToggle = document.getElementById("nicheSettingsToggle");
@@ -2132,6 +2285,12 @@
 
     const stopWords = new Set(["the","a","an","is","it","this","that","you","i","my","so","do","in","on","at","to","for","of","and","or","but","not","with","from","will","wont","dont","cant","how","what","why","when","where","who","most","very","just","more","before","after","watch","wait","until","part","vs","ft","like","get","got","go","going","make","making","made","see","look","take","new","try","ever","even","one","way","day","time","things","thing","every","never","first","last","best","worst","real","really","still","back","into","been","about","these","those","them","only","over","than","should","could","would","much","many","some","your","our","their","his","her","shorts","short","video","subscribe","viral","fyp","foryou","tiktok","youtube"]);
 
+    // Role modal buttons always available before initApp
+    roleSelectAdmin.addEventListener("click", handleRoleSelectAdmin);
+    roleSelectMember.addEventListener("click", handleRoleSelectMember);
+
+    function initApp() {
+    applyRoleVisibility();
     apiKeyInput.value = localStorage.getItem(API_KEY_STORAGE) || "";
     loadFilters();
     loadTrackedChannels();
@@ -2226,6 +2385,10 @@
     clearSyncActivityBtn.addEventListener("click", clearSyncActivityLog);
     addApiKeyBtn.addEventListener("click", addManagedApiKey);
     apiKeyManagementBody.addEventListener("click", handleApiKeyManagementActions);
+    saveMemberOwnKeyBtn.addEventListener("click", handleSaveMemberOwnKey);
+    removeMemberOwnKeyBtn.addEventListener("click", handleRemoveMemberOwnKey);
+    changeAdminPinBtn.addEventListener("click", handleChangeAdminPin);
+    resetRoleBtn.addEventListener("click", handleResetRole);
 
     updateTotalQuotaDisplay();
     renderTrackedChannels();
@@ -2242,10 +2405,14 @@
     renderAlertsPage();
     renderMemberProfileSettings();
     renderApiKeyManagementTable();
+    renderMemberOwnKeySection();
     renderSyncActivityLog();
     updateGoogleSheetConnectionStatus();
     setupAutoSyncTimer();
     syncToGoogleSheet({ silent: true });
+    } // end initApp
+
+    checkRoleAndInit();
 
     function switchTab(tab) {
       const isDiscovery = tab === "discovery";
@@ -3659,6 +3826,27 @@
         teamApiKeys = seeded;
         if (seeded.length) saveTeamApiKeys();
       }
+      // For member role: ensure own key is always in the pool
+      if (!isAdmin()) {
+        const ownData = getMemberOwnKeyData();
+        if (ownData && ownData.key) {
+          const owner = ownData.owner || memberProfile.name || "Member";
+          const alreadyIn = teamApiKeys.some((k) => k.key === ownData.key);
+          if (!alreadyIn) {
+            teamApiKeys.push({
+              key: ownData.key,
+              owner,
+              addedAt: ownData.addedAt || new Date().toISOString(),
+              quotaUsed: 0,
+              lastUsed: null,
+              failures: 0,
+              status: "active",
+              quotaDate: getLocalDayKey()
+            });
+            saveTeamApiKeys();
+          }
+        }
+      }
       resetApiKeyQuotaIfNewDay();
       renderApiKeyManagementTable();
     }
@@ -3839,6 +4027,7 @@
       memberProfile.autoSync = !!autoSyncToggle.checked;
       saveMemberProfile();
       renderMemberProfileSettings();
+      renderMemberOwnKeySection();
       updateGoogleSheetConnectionStatus();
       setupAutoSyncTimer();
       showToast("Profile saved.");
@@ -4756,7 +4945,7 @@
         return;
       }
       try {
-        const response = await fetch(`${endpoint}${endpoint.includes("?") ? "&" : "?"}ping=1`, { method: "GET" });
+        const response = await fetch(endpoint, { method: "GET" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         updateGoogleSheetConnectionStatus(true);
         addSyncActivityEntry("test_connection", "success", "Connection test succeeded.");
@@ -4792,19 +4981,20 @@
     }
 
     async function postSheetAction(endpoint, payload) {
-      const response = await fetch(endpoint, {
+      await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
         body: JSON.stringify(payload)
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json().catch(() => ({}));
+      // no-cors returns an opaque response; assume success if no exception thrown
+      return { ok: true };
     }
 
     function buildMemberSyncPayload() {
       const trackedList = Object.values(trackedChannels);
       const nicheSet = new Set(trackedList.map((ch) => normalizeNicheTag(ch.nicheKeyword)).filter(Boolean));
-      const alertsToday = alertHistory.filter((item) => getLocalDateKey(new Date(item.detectedAt || 0)) === getLocalDateKey(new Date())).length;
+      const alertsToday = alertHistory.filter((item) => isToday(item.detectedAt || item.timestamp || "")).length;
       return {
         action: "sync_member",
         memberData: {
@@ -4848,6 +5038,13 @@
           niche: normalizeNicheTag(item.nicheKeyword || "")
         }))
       };
+    }
+
+    function isToday(dateString) {
+      const d = new Date(dateString);
+      if (Number.isNaN(d.getTime())) return false;
+      const now = new Date();
+      return d.toDateString() === now.toDateString();
     }
 
     async function syncToGoogleSheet(options = {}) {
@@ -6135,6 +6332,227 @@
       } finally {
         setLoading(false);
       }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ROLE SYSTEM
+    // ─────────────────────────────────────────────────────────────
+
+    function getUserRole() {
+      return localStorage.getItem(USER_ROLE_STORAGE) || "";
+    }
+
+    function isAdmin() {
+      return getUserRole() === "admin";
+    }
+
+    function applyRoleVisibility() {
+      const admin = isAdmin();
+      // Team tab: admin only
+      if (tabTeam) tabTeam.style.display = admin ? "" : "none";
+      // Settings sections
+      if (adminOnlySettings) adminOnlySettings.style.display = admin ? "" : "none";
+      if (memberOnlySettings) memberOnlySettings.style.display = admin ? "none" : "";
+      // Role label
+      if (currentRoleDisplay) currentRoleDisplay.textContent = admin ? "Admin 🔑" : "Team Member 👤";
+    }
+
+    function showRoleModal() {
+      if (roleModal) roleModal.style.display = "flex";
+    }
+
+    function hideRoleModal() {
+      if (roleModal) roleModal.style.display = "none";
+    }
+
+    function checkRoleAndInit() {
+      const role = getUserRole();
+      if (!role) {
+        showRoleModal();
+      } else {
+        initApp();
+      }
+    }
+
+    function handleRoleSelectAdmin() {
+      const existingPin = localStorage.getItem(ADMIN_PIN_STORAGE);
+      if (existingPin) {
+        const pin = prompt("Enter your admin PIN to continue:");
+        if (!pin) return;
+        if (pin !== existingPin) {
+          alert("Incorrect PIN. Try again.");
+          return;
+        }
+        localStorage.setItem(USER_ROLE_STORAGE, "admin");
+        hideRoleModal();
+        initApp();
+      } else {
+        const pin = prompt("Create a 4-digit admin PIN:");
+        if (!pin) return;
+        if (!/^\d{4}$/.test(pin)) {
+          alert("Please enter exactly 4 digits.");
+          return;
+        }
+        const pin2 = prompt("Confirm your 4-digit admin PIN:");
+        if (pin !== pin2) {
+          alert("PINs don't match. Try again.");
+          return;
+        }
+        localStorage.setItem(USER_ROLE_STORAGE, "admin");
+        localStorage.setItem(ADMIN_PIN_STORAGE, pin);
+        // Pre-fill name as Admin
+        const profileRaw = localStorage.getItem(MEMBER_PROFILE_STORAGE);
+        const profile = profileRaw ? JSON.parse(profileRaw) : {};
+        if (!profile.name) {
+          profile.name = "Admin";
+          if (!profile.memberId) profile.memberId = "admin_" + Math.random().toString(36).slice(2, 8);
+          localStorage.setItem(MEMBER_PROFILE_STORAGE, JSON.stringify(profile));
+        }
+        hideRoleModal();
+        initApp();
+      }
+    }
+
+    function handleRoleSelectMember() {
+      const name = prompt("Enter your name (shown in team dashboard):");
+      if (!name || !name.trim()) {
+        alert("Please enter your name.");
+        return;
+      }
+      localStorage.setItem(USER_ROLE_STORAGE, "member");
+      // Save name into member profile
+      const profileRaw = localStorage.getItem(MEMBER_PROFILE_STORAGE);
+      const profile = profileRaw ? JSON.parse(profileRaw) : {};
+      profile.name = name.trim();
+      if (!profile.memberId) profile.memberId = "member_" + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem(MEMBER_PROFILE_STORAGE, JSON.stringify(profile));
+      hideRoleModal();
+      initApp();
+    }
+
+    function handleResetRole() {
+      if (isAdmin()) {
+        const storedPin = localStorage.getItem(ADMIN_PIN_STORAGE);
+        if (storedPin) {
+          const pin = prompt("Enter your admin PIN to confirm role reset:");
+          if (!pin || pin !== storedPin) {
+            showToast("Incorrect PIN. Role not reset.");
+            return;
+          }
+        }
+      }
+      if (!confirm("Reset your role? You'll need to set up again on next load. Continue?")) return;
+      localStorage.removeItem(USER_ROLE_STORAGE);
+      showToast("Role reset. Reload the page to set up again.");
+      location.reload();
+    }
+
+    function handleChangeAdminPin() {
+      if (!isAdmin()) return;
+      const storedPin = localStorage.getItem(ADMIN_PIN_STORAGE);
+      if (storedPin) {
+        const current = prompt("Enter your current admin PIN:");
+        if (!current || current !== storedPin) {
+          showToast("Incorrect current PIN.");
+          return;
+        }
+      }
+      const newPin = String(newAdminPinInput.value || "").trim();
+      const confirmPin = String(confirmAdminPinInput.value || "").trim();
+      if (!newPin || !/^\d{4}$/.test(newPin)) {
+        showToast("Enter exactly 4 digits in the New PIN field.");
+        return;
+      }
+      if (newPin !== confirmPin) {
+        showToast("PINs don't match.");
+        return;
+      }
+      localStorage.setItem(ADMIN_PIN_STORAGE, newPin);
+      newAdminPinInput.value = "";
+      confirmAdminPinInput.value = "";
+      showToast("Admin PIN changed.");
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // MEMBER OWN KEY (member-only API key management)
+    // ─────────────────────────────────────────────────────────────
+
+    function getMemberOwnKeyData() {
+      const raw = localStorage.getItem(MEMBER_OWN_KEY_STORAGE);
+      if (!raw) return null;
+      try {
+        return JSON.parse(raw);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function saveMemberOwnKeyData(key, owner) {
+      safeSetLocalStorage(MEMBER_OWN_KEY_STORAGE, JSON.stringify({ key, owner }), "member own key");
+    }
+
+    function removeMemberOwnKeyData() {
+      safeRemoveLocalStorage(MEMBER_OWN_KEY_STORAGE);
+    }
+
+    function renderMemberOwnKeySection() {
+      if (!memberOwnKeyOwnerDisplay) return;
+      const owner = memberProfile.name || "You";
+      memberOwnKeyOwnerDisplay.textContent = owner;
+      const data = getMemberOwnKeyData();
+      if (data && data.key) {
+        if (memberOwnKeySavedWrap) memberOwnKeySavedWrap.style.display = "";
+        if (memberOwnKeySavedDisplay) memberOwnKeySavedDisplay.textContent = `Saved: ${maskKeyForDisplay(data.key)} (Added by ${data.owner || owner})`;
+        if (memberOwnKeyInput) memberOwnKeyInput.value = "";
+      } else {
+        if (memberOwnKeySavedWrap) memberOwnKeySavedWrap.style.display = "none";
+        if (memberOwnKeySavedDisplay) memberOwnKeySavedDisplay.textContent = "";
+      }
+    }
+
+    function syncMemberOwnKeyToPool() {
+      const data = getMemberOwnKeyData();
+      const owner = memberProfile.name || "Member";
+      // Remove stale entries for this member before re-adding
+      teamApiKeys = teamApiKeys.filter((item) => item.owner !== owner);
+      if (data && data.key) {
+        teamApiKeys.push({
+          key: data.key,
+          owner: data.owner || owner,
+          addedAt: data.addedAt || new Date().toISOString(),
+          quotaUsed: 0,
+          lastUsed: null,
+          failures: 0,
+          status: "active",
+          quotaDate: getLocalDayKey()
+        });
+      }
+      saveTeamApiKeys();
+    }
+
+    function handleSaveMemberOwnKey() {
+      const key = String(memberOwnKeyInput.value || "").trim();
+      if (!key) {
+        showToast("Enter your API key first.");
+        return;
+      }
+      const owner = memberProfile.name || "Member";
+      saveMemberOwnKeyData(key, owner);
+      syncMemberOwnKeyToPool();
+      renderMemberOwnKeySection();
+      renderApiKeyUsageDashboard();
+      showToast("Your API key saved.");
+    }
+
+    function handleRemoveMemberOwnKey() {
+      if (!confirm("Remove your API key?")) return;
+      const owner = memberProfile.name || "Member";
+      removeMemberOwnKeyData();
+      teamApiKeys = teamApiKeys.filter((item) => item.owner !== owner);
+      saveTeamApiKeys();
+      renderMemberOwnKeySection();
+      renderApiKeyUsageDashboard();
+      showToast("Your API key removed.");
     }
   </script>
 </body>
