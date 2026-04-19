@@ -496,6 +496,9 @@
       padding: 12px 24px;
       border-bottom: 1px solid var(--line);
       background: rgba(14, 22, 32, 0.7);
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: thin;
     }
 
     .tab-btn {
@@ -508,6 +511,7 @@
       cursor: pointer;
       font-family: inherit;
       font-weight: 600;
+      flex: 0 0 auto;
     }
 
     .tab-btn.active {
@@ -1164,9 +1168,12 @@
     </section>
 
     <section class="tabs">
-      <button id="tabDiscovery" class="tab-btn active" type="button">Discovery</button>
-      <button id="tabTracker" class="tab-btn" type="button">Tracker</button>
-      <button id="tabNicheDiscovery" class="tab-btn" type="button">Niche Discovery</button>
+      <button id="tabDiscovery" class="tab-btn active" type="button">🔍 Discovery</button>
+      <button id="tabTracker" class="tab-btn" type="button">📊 Tracker</button>
+      <button id="tabNicheDiscovery" class="tab-btn" type="button">🎯 Niche Analytics</button>
+      <button id="tabAlerts" class="tab-btn" type="button">🔔 Alerts</button>
+      <button id="tabTeam" class="tab-btn" type="button">👥 Team</button>
+      <button id="tabSettings" class="tab-btn" type="button">⚙️ Settings</button>
     </section>
 
     <div id="liveAlerts" class="live-alerts"></div>
@@ -1294,10 +1301,10 @@
           </label>
           <label class="small-muted" for="autoCheckInterval">Check every</label>
           <select id="autoCheckInterval">
-            <option value="30000">30 sec (Ultra)</option>
+            <option value="30000" selected>30 sec (Ultra)</option>
             <option value="60000">1 min</option>
             <option value="120000">2 min</option>
-            <option value="180000" selected>3 min</option>
+            <option value="180000">3 min</option>
             <option value="300000">5 min</option>
             <option value="600000">10 min</option>
             <option value="900000">15 min</option>
@@ -1318,6 +1325,7 @@
         </div>
         <div id="trackerStatus" class="small-muted">Auto-tracking: OFF</div>
         <div id="trackerCycleStats" class="small-muted">Last cycle: -</div>
+        <div id="trackerPerfBadge" class="small-muted">Performance: -</div>
       </section>
 
       <section class="tracker-card" style="margin-top: 12px;">
@@ -1326,11 +1334,16 @@
         </div>
         <div id="trackerQuotaPanel" style="padding: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
           <div class="small-muted">Tracked channels: <strong id="quotaTrackedChannels">0</strong></div>
-          <div class="small-muted">Auto-track method: <strong id="quotaAutoMethod">RSS (free - no quota used)</strong></div>
-          <div class="small-muted">Check interval: <strong id="quotaInterval">every 3 min</strong></div>
+          <div class="small-muted">Auto-track method: <strong id="quotaAutoMethod">PlaylistItems API (1 unit/check)</strong></div>
+          <div class="small-muted">Check interval: <strong id="quotaInterval">every 30 sec</strong></div>
           <div class="small-muted">Alert window: <strong id="quotaAlertWindow">last 5 min</strong></div>
           <div class="small-muted">Quota used today: <strong id="quotaUsedToday">0 units</strong></div>
-          <div class="small-muted">Full 10,000 daily quota available for discovery</div>
+          <div class="small-muted">Tracking daily estimate: <strong id="quotaDailyTrackingEstimate">0 units/day</strong></div>
+          <div class="small-muted">Cycle estimate: <strong id="quotaCycleEstimate">0 units/check</strong></div>
+          <div style="grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 10px;">
+            <div class="small-muted" style="margin-bottom: 6px;"><strong>API Key Usage (Live)</strong> <span id="apiKeyUsageSummary"></span></div>
+            <div id="apiKeyUsageList" class="small-muted">No API activity yet.</div>
+          </div>
         </div>
       </section>
 
@@ -1541,10 +1554,354 @@
         </div>
       </section>
     </section>
+
+    <section id="alertsSection" class="app-section">
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3 style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <span>Alerts Dashboard (<span id="alertsPageCount">0</span>)</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="alertsPageExportBtn" class="btn btn-secondary" type="button">Export Alerts CSV</button>
+            <button id="alertsPageClearBtn" class="btn btn-secondary" type="button">Clear Alerts</button>
+          </div>
+        </h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Channel Name</th>
+                <th>Video Title</th>
+                <th>Niche</th>
+              </tr>
+            </thead>
+            <tbody id="alertsPageBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="teamSection" class="app-section">
+      <section class="tracker-actions">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button id="refreshTeamDashboardBtn" class="btn" type="button">Refresh Dashboard</button>
+          <span id="teamDashboardStatus" class="small-muted">Dashboard not loaded yet.</span>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <div style="padding: 10px 12px; border-bottom: 1px solid var(--line);"><strong>Team Overview</strong></div>
+        <div style="padding: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;">
+          <div class="small-muted">Total Members: <strong id="teamTotalMembers">0</strong></div>
+          <div class="small-muted">Total Channels Tracked: <strong id="teamTotalChannels">0</strong></div>
+          <div class="small-muted">Total Niches Covered: <strong id="teamTotalNiches">0</strong></div>
+          <div class="small-muted">Alerts Today: <strong id="teamAlertsToday">0</strong></div>
+          <div class="small-muted">API Keys Active: <strong id="teamApiKeysActive">0/0</strong></div>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3>Team Members</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Tracked Channels</th>
+                <th>Niches</th>
+                <th>Last Active</th>
+                <th>Alerts Today</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="teamMembersBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>All Tracked Channels</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="teamFilterMember"><option value="">All Members</option></select>
+            <select id="teamFilterNiche"><option value="">All Niches</option></select>
+          </div>
+        </h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Channel Name</th>
+                <th>Subscribers</th>
+                <th>Niche</th>
+                <th>Date Added</th>
+                <th>Last Checked</th>
+              </tr>
+            </thead>
+            <tbody id="teamChannelsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3>Recent Team Alerts</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Member</th>
+                <th>Channel</th>
+                <th>Video Title</th>
+                <th>Niche</th>
+              </tr>
+            </thead>
+            <tbody id="teamAlertsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3>API Key Health</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Key (masked)</th>
+                <th>Owner</th>
+                <th>Quota Used Today</th>
+                <th>Failures</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="teamApiHealthBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="settingsSection" class="app-section">
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3>Member Profile</h3>
+        <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+          <div>
+            <label for="memberNameInput">Member Name</label>
+            <input id="memberNameInput" type="text" placeholder="e.g. Aqeel" />
+          </div>
+          <div>
+            <label for="memberIdInput">Member ID</label>
+            <input id="memberIdInput" type="text" readonly />
+            <div class="small-muted">Your ID: <strong id="memberIdText">-</strong></div>
+          </div>
+          <div style="align-self:end;">
+            <button id="saveMemberProfileBtn" class="btn btn-secondary" type="button">Save Profile</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3>Google Sheets Connection</h3>
+        <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+          <div style="grid-column:1 / -1;">
+            <label for="googleSheetUrlInput">Google Apps Script Web App URL</label>
+            <input id="googleSheetUrlInput" type="text" placeholder="https://script.google.com/macros/s/.../exec" />
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
+            <button id="testGoogleSheetBtn" class="btn btn-secondary" type="button">Test Connection</button>
+            <button id="syncNowBtn" class="btn" type="button">Sync Now</button>
+          </div>
+          <div>
+            <label class="inline-toggle" for="autoSyncToggle">
+              <input id="autoSyncToggle" type="checkbox" /> Auto-sync every 5 minutes
+            </label>
+          </div>
+          <div class="small-muted" style="align-self:end;">Status: <strong id="googleSheetStatus">Not Connected ❌</strong></div>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <span>Sync Activity Log (<span id="syncActivityCount">0</span>)</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="syncActivityFilter" class="btn btn-secondary" style="min-width: 140px;">
+              <option value="all">All Entries</option>
+              <option value="success">Success</option>
+              <option value="error">Error</option>
+              <option value="info">Info</option>
+            </select>
+            <button id="exportSyncActivityCsvBtn" class="btn btn-secondary" type="button">Export CSV</button>
+            <button id="clearSyncActivityBtn" class="btn btn-secondary" type="button">Clear Log</button>
+          </div>
+        </h3>
+        <div style="padding:12px;">
+          <ul id="syncActivityLog" class="alerts-live-list"></ul>
+        </div>
+      </section>
+
+      <section class="tracker-card" style="margin-top: 12px;">
+        <h3>API Key Management</h3>
+        <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+          <div>
+            <label for="newApiKeyInput">Add New API Key</label>
+            <input id="newApiKeyInput" type="password" placeholder="AIzaSy..." autocomplete="off" />
+          </div>
+          <div>
+            <label for="newApiKeyOwnerInput">Key Owner Name</label>
+            <input id="newApiKeyOwnerInput" type="text" placeholder="Owner name" />
+          </div>
+          <div style="align-self:end;">
+            <button id="addApiKeyBtn" class="btn" type="button">Add Key</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="padding: 0 12px 12px 12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>API Key (masked)</th>
+                <th>Added By</th>
+                <th>Status</th>
+                <th>Quota Used</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="apiKeyManagementBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
   </main>
+
+  <!--
+  Google Apps Script (copy into Extensions > Apps Script in your Google Sheet):
+  function doPost(e) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet();
+    var data = JSON.parse(e.postData.contents);
+    var action = data.action;
+
+    if (action === "sync_member") {
+      var memberSheet = sheet.getSheetByName("Members") || sheet.insertSheet("Members");
+      var memberData = data.memberData;
+      var rows = memberSheet.getDataRange().getValues();
+      var found = false;
+      for (var i = 1; i < rows.length; i++) {
+        if (rows[i][0] === memberData.memberId) {
+          memberSheet.getRange(i + 1, 1, 1, 7).setValues([[
+            memberData.memberId,
+            memberData.name,
+            memberData.apiKey ? memberData.apiKey.substring(0, 8) + "..." : "",
+            memberData.trackedChannelsCount,
+            memberData.nichesTracking,
+            memberData.lastActive,
+            memberData.alertsToday
+          ]]);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        if (rows.length <= 1) {
+          memberSheet.getRange(1, 1, 1, 7).setValues([["Member ID", "Name", "API Key (masked)", "Tracked Channels", "Niches", "Last Active", "Alerts Today"]]);
+        }
+        memberSheet.appendRow([
+          memberData.memberId,
+          memberData.name,
+          memberData.apiKey ? memberData.apiKey.substring(0, 8) + "..." : "",
+          memberData.trackedChannelsCount,
+          memberData.nichesTracking,
+          memberData.lastActive,
+          memberData.alertsToday
+        ]);
+      }
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "sync_channels") {
+      var channelSheet = sheet.getSheetByName("TrackedChannels") || sheet.insertSheet("TrackedChannels");
+      var channelData = data.channels;
+      var memberId = data.memberId;
+      var rows = channelSheet.getDataRange().getValues();
+      for (var j = rows.length - 1; j >= 1; j--) {
+        if (rows[j][0] === memberId) channelSheet.deleteRow(j + 1);
+      }
+      if (rows.length <= 1) {
+        channelSheet.getRange(1, 1, 1, 8).setValues([["Member ID", "Member Name", "Channel Name", "Channel ID", "Subscribers", "Niche", "Date Added", "Last Checked"]]);
+      }
+      channelData.forEach(function(ch) {
+        channelSheet.appendRow([memberId, data.memberName, ch.channelTitle, ch.channelId, ch.subscriberCount, ch.nicheKeyword, ch.dateAdded, ch.lastChecked]);
+      });
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "sync_alerts") {
+      var alertSheet = sheet.getSheetByName("Alerts") || sheet.insertSheet("Alerts");
+      var alerts = data.alerts;
+      var member = data.memberId;
+      if (alertSheet.getLastRow() <= 1) {
+        alertSheet.getRange(1, 1, 1, 7).setValues([["Member ID", "Member Name", "Timestamp", "Channel", "Video Title", "Video ID", "Niche"]]);
+      }
+      alerts.forEach(function(alert) {
+        alertSheet.appendRow([member, data.memberName, alert.timestamp, alert.channelTitle, alert.videoTitle, alert.videoId, alert.niche]);
+      });
+      return ContentService.createTextOutput(JSON.stringify({success: true})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({error: "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  function doGet(e) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet();
+    var result = {};
+    var memberSheet = sheet.getSheetByName("Members");
+    if (memberSheet) {
+      var memberData = memberSheet.getDataRange().getValues();
+      var headers = memberData[0] || [];
+      result.members = memberData.slice(1).map(function(row) {
+        var obj = {};
+        headers.forEach(function(h, i) { obj[h] = row[i]; });
+        return obj;
+      });
+    }
+    var channelSheet = sheet.getSheetByName("TrackedChannels");
+    if (channelSheet) {
+      var channelData = channelSheet.getDataRange().getValues();
+      var channelHeaders = channelData[0] || [];
+      result.channels = channelData.slice(1).map(function(row) {
+        var obj = {};
+        channelHeaders.forEach(function(h, i) { obj[h] = row[i]; });
+        return obj;
+      });
+    }
+    var alertSheet = sheet.getSheetByName("Alerts");
+    if (alertSheet) {
+      var alertData = alertSheet.getDataRange().getValues();
+      var alertHeaders = alertData[0] || [];
+      result.alerts = alertData.slice(1).map(function(row) {
+        var obj = {};
+        alertHeaders.forEach(function(h, i) { obj[h] = row[i]; });
+        return obj;
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  }
+  -->
 
   <script>
     const API_BASE = "https://www.googleapis.com/youtube/v3";
+    const YOUTUBE_API_KEYS = [
+      // Team members add their YouTube API keys here
+      // "AIzaSy...", // Aqeel
+      // "AIzaSy...", // Hamza
+      // "AIzaSy...", // Team Member 3
+      // "AIzaSy...", // Team Member 4
+      // "AIzaSy...", // Team Member 5
+      // "AIzaSy...", // Team Member 6
+      // "AIzaSy...", // Team Member 7
+      // "AIzaSy...", // Team Member 8
+      // "AIzaSy...", // Team Member 9
+      // "AIzaSy...", // Team Member 10
+    ];
     const API_KEY_STORAGE = "yt_niche_tool_api_key";
     const TOTAL_QUOTA_STORAGE = "yt_niche_tool_total_quota";
     const FILTERS_STORAGE = "yt_niche_tool_filters";
@@ -1552,23 +1909,28 @@
     const ALERT_HISTORY_STORAGE = "yt_niche_tool_alert_history";
     const AUTO_CHECK_STORAGE = "yt_niche_tool_auto_check";
     const SEEN_VIDEOS_STORAGE = "yt_niche_tool_seen_videos";
+    const TEAM_API_KEYS_STORAGE = "yt_team_api_keys";
+    const MEMBER_PROFILE_STORAGE = "yt_member_profile";
+    const GOOGLE_SHEET_URL_STORAGE = "yt_google_sheet_url";
+    const AUTO_SYNC_STORAGE = "yt_auto_sync_enabled";
+    const SYNC_ACTIVITY_LOG_STORAGE = "yt_sync_activity_log";
+    const LAST_SYNC_ALERT_TS_STORAGE = "yt_last_sync_alert_ts";
     const DEFAULT_ALERT_WINDOW_MS = 300000;
     const ALERT_WINDOW_OPTIONS = [60000, 120000, 180000, 240000, 300000];
     const ULTRA_CHECK_INTERVAL_MS = 30000;
     const ULTRA_ALERT_WINDOW_MS = 60000;
-    const ULTRA_RETRY_COOLDOWN_MS = 120000;
     const QUOTA_USED_TODAY_STORAGE = "quota_used_today";
-    const CORS_PROXIES = [
-      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-      (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-      (url) => `https://nordicapis.com/wp-json/fetch/v1/proxy?url=${encodeURIComponent(url)}`,
-      (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
-      (url) => `https://cors-anywhere.herokuapp.com/${url}`
-    ];
     const NICHE_SAVED_STORAGE = "yt_niche_saved_items";
     const NICHE_SCAN_HISTORY_STORAGE = "yt_niche_scan_history";
     const PUSH_SERVER_BASE = window.location.port === "8765" ? window.location.origin : "http://127.0.0.1:8765";
+    let currentAPIKeyIndex = 0;
+    let lastUsedAPIKeyIndex = -1;
+    const apiKeyStats = {};
+    YOUTUBE_API_KEYS.forEach((key, index) => {
+      if (String(key || "").trim()) {
+        apiKeyStats[index] = { quotaUsed: 0, lastUsed: null };
+      }
+    });
 
     const apiKeyInput = document.getElementById("apiKey");
     const keywordInput = document.getElementById("keyword");
@@ -1602,6 +1964,7 @@
     const alertsHistoryBody = document.getElementById("alertsHistoryBody");
     const trackerStatus = document.getElementById("trackerStatus");
     const trackerCycleStats = document.getElementById("trackerCycleStats");
+    const trackerPerfBadge = document.getElementById("trackerPerfBadge");
     const checkNowBtn = document.getElementById("checkNowBtn");
     const addChannelBtn = document.getElementById("addChannelBtn");
     const autoCheckToggle = document.getElementById("autoCheckToggle");
@@ -1623,13 +1986,58 @@
     const quotaInterval = document.getElementById("quotaInterval");
     const quotaAlertWindow = document.getElementById("quotaAlertWindow");
     const quotaUsedToday = document.getElementById("quotaUsedToday");
+    const quotaDailyTrackingEstimate = document.getElementById("quotaDailyTrackingEstimate");
+    const quotaCycleEstimate = document.getElementById("quotaCycleEstimate");
+    const apiKeyUsageSummary = document.getElementById("apiKeyUsageSummary");
+    const apiKeyUsageList = document.getElementById("apiKeyUsageList");
     const tabDiscovery = document.getElementById("tabDiscovery");
     const tabTracker = document.getElementById("tabTracker");
     const tabNicheDiscovery = document.getElementById("tabNicheDiscovery");
+    const tabAlerts = document.getElementById("tabAlerts");
+    const tabTeam = document.getElementById("tabTeam");
+    const tabSettings = document.getElementById("tabSettings");
     const discoverySection = document.getElementById("discoverySection");
     const trackerSection = document.getElementById("trackerSection");
     const nicheDiscoverySection = document.getElementById("nicheDiscoverySection");
+    const alertsSection = document.getElementById("alertsSection");
+    const teamSection = document.getElementById("teamSection");
+    const settingsSection = document.getElementById("settingsSection");
     const liveAlerts = document.getElementById("liveAlerts");
+    const alertsPageBody = document.getElementById("alertsPageBody");
+    const alertsPageCount = document.getElementById("alertsPageCount");
+    const alertsPageExportBtn = document.getElementById("alertsPageExportBtn");
+    const alertsPageClearBtn = document.getElementById("alertsPageClearBtn");
+    const refreshTeamDashboardBtn = document.getElementById("refreshTeamDashboardBtn");
+    const teamDashboardStatus = document.getElementById("teamDashboardStatus");
+    const teamTotalMembers = document.getElementById("teamTotalMembers");
+    const teamTotalChannels = document.getElementById("teamTotalChannels");
+    const teamTotalNiches = document.getElementById("teamTotalNiches");
+    const teamAlertsToday = document.getElementById("teamAlertsToday");
+    const teamApiKeysActive = document.getElementById("teamApiKeysActive");
+    const teamMembersBody = document.getElementById("teamMembersBody");
+    const teamChannelsBody = document.getElementById("teamChannelsBody");
+    const teamAlertsBody = document.getElementById("teamAlertsBody");
+    const teamApiHealthBody = document.getElementById("teamApiHealthBody");
+    const teamFilterMember = document.getElementById("teamFilterMember");
+    const teamFilterNiche = document.getElementById("teamFilterNiche");
+    const memberNameInput = document.getElementById("memberNameInput");
+    const memberIdInput = document.getElementById("memberIdInput");
+    const memberIdText = document.getElementById("memberIdText");
+    const saveMemberProfileBtn = document.getElementById("saveMemberProfileBtn");
+    const googleSheetUrlInput = document.getElementById("googleSheetUrlInput");
+    const testGoogleSheetBtn = document.getElementById("testGoogleSheetBtn");
+    const syncNowBtn = document.getElementById("syncNowBtn");
+    const autoSyncToggle = document.getElementById("autoSyncToggle");
+    const googleSheetStatus = document.getElementById("googleSheetStatus");
+    const syncActivityLog = document.getElementById("syncActivityLog");
+    const syncActivityCount = document.getElementById("syncActivityCount");
+    const syncActivityFilter = document.getElementById("syncActivityFilter");
+    const exportSyncActivityCsvBtn = document.getElementById("exportSyncActivityCsvBtn");
+    const clearSyncActivityBtn = document.getElementById("clearSyncActivityBtn");
+    const newApiKeyInput = document.getElementById("newApiKeyInput");
+    const newApiKeyOwnerInput = document.getElementById("newApiKeyOwnerInput");
+    const addApiKeyBtn = document.getElementById("addApiKeyBtn");
+    const apiKeyManagementBody = document.getElementById("apiKeyManagementBody");
     const nicheCategoryCards = document.getElementById("nicheCategoryCards");
     const nicheSettings = document.getElementById("nicheSettings");
     const nicheSettingsToggle = document.getElementById("nicheSettingsToggle");
@@ -1686,15 +2094,15 @@
       maxChannelAgeDays: Infinity,
       country: ""
     };
-    let autoCheckConfig = { enabled: false, intervalMs: 180000, alertWindowMs: DEFAULT_ALERT_WINDOW_MS };
+    let autoCheckConfig = { enabled: false, intervalMs: ULTRA_CHECK_INTERVAL_MS, alertWindowMs: DEFAULT_ALERT_WINDOW_MS };
     let autoCheckTimer = null;
     let autoCheckCountdownTimer = null;
     let autoCheckNextRunAt = null;
     let isCheckingFeeds = false;
-    let channelRetryAfter = {};
     let trackerActiveNiche = "All Channels";
     let trackerExpandedRows = {};
     let trackerLastCycleStats = { success: 0, total: 0, failed: 0 };
+    let trackerCycleHistory = [];
     let nicheSavedItems = [];
     let nicheScanHistory = [];
     let nicheResults = [];
@@ -1706,6 +2114,13 @@
     let nicheCurrentQuotaUsed = 0;
     let serviceWorkerRegistration = null;
     let webPushSubscriptionActive = false;
+    let teamApiKeys = [];
+    let memberProfile = { memberId: "", name: "", googleSheetUrl: "", autoSync: false };
+    let autoSyncTimer = null;
+    let autoSyncPendingTimer = null;
+    let teamDashboardData = { members: [], channels: [], alerts: [] };
+    let syncActivityEntries = [];
+    let syncActivityFilterValue = "all";
 
     const nicheCategories = [
       { id: 26, name: "Howto & Style", description: "Epoxy, cleaning, restoration, DIY, detailing", seedQuery: "how to" },
@@ -1724,6 +2139,9 @@
     loadAutoCheckConfig();
     loadNicheSavedItems();
     loadNicheScanHistory();
+    loadMemberProfile();
+    loadTeamApiKeys();
+    loadSyncActivityLog();
 
     searchBtn.addEventListener("click", runSearch);
     keywordInput.addEventListener("keydown", (event) => {
@@ -1759,6 +2177,9 @@
     tabDiscovery.addEventListener("click", () => switchTab("discovery"));
     tabTracker.addEventListener("click", () => switchTab("tracker"));
     tabNicheDiscovery.addEventListener("click", () => switchTab("niche"));
+    tabAlerts.addEventListener("click", () => switchTab("alerts"));
+    tabTeam.addEventListener("click", () => switchTab("team"));
+    tabSettings.addEventListener("click", () => switchTab("settings"));
     nicheSettingsToggle.addEventListener("click", () => nicheSettings.classList.toggle("open"));
     discoverNichesBtn.addEventListener("click", prepareNicheScan);
     startNicheScanBtn.addEventListener("click", startNicheScan);
@@ -1787,6 +2208,24 @@
     savedNichesBody.addEventListener("click", handleSavedNicheActions);
     pastScansSelect.addEventListener("change", loadPastScanByIndex);
     notificationBadge.addEventListener("click", requestNotificationPermission);
+    apiKeyInput.addEventListener("input", renderApiKeyUsageDashboard);
+    alertsPageExportBtn.addEventListener("click", exportAlertsCsv);
+    alertsPageClearBtn.addEventListener("click", clearAlertHistory);
+    refreshTeamDashboardBtn.addEventListener("click", fetchDashboardData);
+    teamFilterMember.addEventListener("change", renderTeamDashboard);
+    teamFilterNiche.addEventListener("change", renderTeamDashboard);
+    saveMemberProfileBtn.addEventListener("click", saveMemberProfileFromSettings);
+    testGoogleSheetBtn.addEventListener("click", testGoogleSheetConnection);
+    syncNowBtn.addEventListener("click", syncToGoogleSheet);
+    autoSyncToggle.addEventListener("change", toggleAutoSync);
+    syncActivityFilter.addEventListener("change", () => {
+      syncActivityFilterValue = String(syncActivityFilter.value || "all");
+      renderSyncActivityLog();
+    });
+    exportSyncActivityCsvBtn.addEventListener("click", exportSyncActivityCsv);
+    clearSyncActivityBtn.addEventListener("click", clearSyncActivityLog);
+    addApiKeyBtn.addEventListener("click", addManagedApiKey);
+    apiKeyManagementBody.addEventListener("click", handleApiKeyManagementActions);
 
     updateTotalQuotaDisplay();
     renderTrackedChannels();
@@ -1799,19 +2238,42 @@
     resetNicheFilters();
     initializeNotificationState();
     initializeWebPush();
+    renderApiKeyUsageDashboard();
+    renderAlertsPage();
+    renderMemberProfileSettings();
+    renderApiKeyManagementTable();
+    renderSyncActivityLog();
+    updateGoogleSheetConnectionStatus();
+    setupAutoSyncTimer();
+    syncToGoogleSheet({ silent: true });
 
     function switchTab(tab) {
       const isDiscovery = tab === "discovery";
       const isTracker = tab === "tracker";
       const isNiche = tab === "niche";
+      const isAlerts = tab === "alerts";
+      const isTeam = tab === "team";
+      const isSettings = tab === "settings";
       discoverySection.classList.toggle("active", isDiscovery);
       trackerSection.classList.toggle("active", isTracker);
       nicheDiscoverySection.classList.toggle("active", isNiche);
+      alertsSection.classList.toggle("active", isAlerts);
+      teamSection.classList.toggle("active", isTeam);
+      settingsSection.classList.toggle("active", isSettings);
       tabDiscovery.classList.toggle("active", isDiscovery);
       tabTracker.classList.toggle("active", isTracker);
       tabNicheDiscovery.classList.toggle("active", isNiche);
+      tabAlerts.classList.toggle("active", isAlerts);
+      tabTeam.classList.toggle("active", isTeam);
+      tabSettings.classList.toggle("active", isSettings);
       if (isTracker) {
         updateTrackerQuotaDashboard();
+      }
+      if (isAlerts) {
+        renderAlertsPage();
+      }
+      if (isTeam) {
+        fetchDashboardData({ silent: true });
       }
     }
 
@@ -1989,10 +2451,9 @@
         showToast("Select a category first.");
         return;
       }
-      const apiKey = apiKeyInput.value.trim();
-      if (!apiKey) {
+      if (!hasConfiguredAPIKeys()) {
         switchTab("discovery");
-        showError("Please enter a valid YouTube API key.");
+        showError("Add at least one API key in YOUTUBE_API_KEYS (or API key input).");
         return;
       }
       const estimate = estimateNicheQuota();
@@ -2000,9 +2461,9 @@
       const usedToday = getDailyQuotaUsed();
       const projectedTotalToday = usedToday + trackerDaily + estimate.total;
       if (estimate.hasVideoCache) {
-        scanConfirmText.textContent = `Video data cached. This scan will use ~${estimate.total} quota units (validation only). Step 1-2: ${estimate.step12} units (cached) + Step 4: ${estimate.step4} units. Auto-track uses RSS (free). Total today after scan: ${projectedTotalToday}/10000.`;
+        scanConfirmText.textContent = `Video data cached. This scan will use ~${estimate.total} quota units (validation only). Step 1-2: ${estimate.step12} units (cached) + Step 4: ${estimate.step4} units. Auto-track uses PlaylistItems API (1 unit/check). Total today after scan: ${projectedTotalToday}/10000.`;
       } else {
-        scanConfirmText.textContent = `This scan will use ~${estimate.total} quota units (full scan). Step 1-2: ${estimate.step12} units (fresh) + Step 4: ${estimate.step4} units. Auto-track uses RSS (free). Total today after scan: ${projectedTotalToday}/10000.`;
+        scanConfirmText.textContent = `This scan will use ~${estimate.total} quota units (full scan). Step 1-2: ${estimate.step12} units (fresh) + Step 4: ${estimate.step4} units. Auto-track uses PlaylistItems API (1 unit/check). Total today after scan: ${projectedTotalToday}/10000.`;
       }
       scanConfirm.classList.add("open");
     }
@@ -2118,7 +2579,7 @@
       return candidates;
     }
 
-    async function validateNichePhrase(apiKey, phrase, publishedAfter, regionCode, totalCount, index) {
+    async function validateNichePhrase(phrase, publishedAfter, regionCode, totalCount, index) {
       if (nicheScanCancelRequested) return null;
       updateNicheProgress(`Step 4/4: Validating niche ${index + 1} of ${totalCount}...`, 60 + ((index + 1) / Math.max(totalCount, 1)) * 40, `Validating: ${phrase.keyword}`);
 
@@ -2130,8 +2591,7 @@
         publishedAfter,
         order: "viewCount",
         regionCode,
-        maxResults: "10",
-        key: apiKey
+        maxResults: "10"
       });
       const searchData = await fetchJsonLogged(searchUrl, `Step 4 Validate ${index + 1}/${totalCount}`);
       nicheCurrentQuotaUsed += 100;
@@ -2144,8 +2604,7 @@
       if (videoIds.length) {
         const videoUrl = buildUrl("videos", {
           part: "statistics",
-          id: videoIds.join(","),
-          key: apiKey
+          id: videoIds.join(",")
         });
         const videoData = await fetchJsonLogged(videoUrl, `Step 4 Videos ${index + 1}/${totalCount}`);
         nicheCurrentQuotaUsed += 1;
@@ -2156,8 +2615,7 @@
       if (channelIds.length) {
         const channelUrl = buildUrl("channels", {
           part: "statistics",
-          id: channelIds.join(","),
-          key: apiKey
+          id: channelIds.join(",")
         });
         const channelData = await fetchJsonLogged(channelUrl, `Step 4 Channels ${index + 1}/${totalCount}`);
         nicheCurrentQuotaUsed += 5;
@@ -2381,9 +2839,8 @@
     async function startNicheScan() {
       if (nicheScanInProgress) return;
       scanConfirm.classList.remove("open");
-      const apiKey = apiKeyInput.value.trim();
-      if (!apiKey) {
-        showError("Please enter a valid YouTube API key.");
+      if (!hasConfiguredAPIKeys()) {
+        showError("Add at least one API key in YOUTUBE_API_KEYS (or API key input) before scanning.");
         switchTab("discovery");
         return;
       }
@@ -2406,7 +2863,7 @@
       const publishedAfter = getPublishedAfterFromDays(days);
       const preKnownCache = readDiscoveredPhrasesCache(selectedNicheCategory.id);
 
-      console.log(`Step 1: Starting scan for category ${selectedNicheCategory?.id} with API key ${apiKey ? `${apiKey.slice(0, 5)}...` : "<empty>"}...`);
+      console.log(`Step 1: Starting scan for category ${selectedNicheCategory?.id} with ${getConfiguredAPIKeys().length} API key(s)...`);
       console.log(`Step 1: Selected category ID: ${selectedNicheCategory?.id}`);
       console.log(`Step 1: publishedAfter: ${publishedAfter}`);
       console.log("Step 1: Settings", { regionCode, days, minFreq, maxValidate, categoryName: selectedNicheCategory?.name });
@@ -2447,8 +2904,7 @@
               order: "viewCount",
               regionCode,
               maxResults: "50",
-              videoCategoryId: String(selectedNicheCategory.id),
-              key: apiKey
+              videoCategoryId: String(selectedNicheCategory.id)
             };
             if (nextPageToken) params.pageToken = nextPageToken;
             const url = buildUrl("search", params);
@@ -2482,8 +2938,7 @@
             updateNicheProgress("Step 2/4: Fetching video & channel details...", 30 + ((i + 1) / Math.max(videoBatches.length, 1)) * 12, `Fetching video details batch ${i + 1}/${videoBatches.length}`);
             const videoUrl = buildUrl("videos", {
               part: "snippet,statistics",
-              id: videoBatches[i].join(","),
-              key: apiKey
+              id: videoBatches[i].join(",")
             });
             const data = await fetchJsonLogged(videoUrl, `Step 2 Videos batch ${i + 1}/${videoBatches.length}`);
             nicheCurrentQuotaUsed += 1;
@@ -2497,8 +2952,7 @@
             updateNicheProgress("Step 2/4: Fetching video & channel details...", 42 + ((i + 1) / Math.max(channelBatches.length, 1)) * 13, `Fetching channel details batch ${i + 1}/${channelBatches.length}`);
             const channelUrl = buildUrl("channels", {
               part: "snippet,statistics",
-              id: channelBatches[i].join(","),
-              key: apiKey
+              id: channelBatches[i].join(",")
             });
             const data = await fetchJsonLogged(channelUrl, `Step 2 Channels batch ${i + 1}/${channelBatches.length}`);
             nicheCurrentQuotaUsed += 5;
@@ -2556,7 +3010,7 @@
         for (let i = 0; i < candidates.length; i++) {
           if (nicheScanCancelRequested) break;
           try {
-            const result = await validateNichePhrase(apiKey, candidates[i], publishedAfter, regionCode, candidates.length, i);
+            const result = await validateNichePhrase(candidates[i], publishedAfter, regionCode, candidates.length, i);
             if (result) validated.push(result);
           } catch (error) {
             console.error(`Step 4: Validation failed for niche ${i + 1} of ${candidates.length}`, error);
@@ -2962,14 +3416,23 @@
       const intervalSec = Math.max(30, Math.round(autoCheckConfig.intervalMs / 1000));
       const alertWindowMin = Math.max(1, Math.round(Number(autoCheckConfig.alertWindowMs || DEFAULT_ALERT_WINDOW_MS) / 60000));
       const usedToday = getDailyQuotaUsed();
+      const cycleEstimate = channels;
+      const cyclesPerDay = Math.floor(86400 / intervalSec);
+      const dailyEstimate = cycleEstimate * cyclesPerDay;
+      const activeKeyHuman = getConfiguredAPIKeys().length
+        ? (lastUsedAPIKeyIndex >= 0 ? `K${lastUsedAPIKeyIndex + 1}` : `K${Math.min(getConfiguredAPIKeys().length, currentAPIKeyIndex + 1)}`)
+        : "-";
 
       quotaTrackedChannels.textContent = String(channels);
       if (quotaAutoMethod) {
-        quotaAutoMethod.textContent = "RSS (free - no quota used)";
+        quotaAutoMethod.textContent = `PlaylistItems API (1 unit/check) - active ${activeKeyHuman}`;
       }
       quotaInterval.textContent = intervalSec < 60 ? `every ${intervalSec} sec` : `every ${Math.round(intervalSec / 60)} min`;
       if (quotaAlertWindow) quotaAlertWindow.textContent = `last ${alertWindowMin} min`;
       quotaUsedToday.textContent = `${usedToday} units`;
+      if (quotaCycleEstimate) quotaCycleEstimate.textContent = `${cycleEstimate} units/check`;
+      if (quotaDailyTrackingEstimate) quotaDailyTrackingEstimate.textContent = `${dailyEstimate.toLocaleString()} units/day`;
+      renderApiKeyUsageDashboard();
     }
 
     function getQuotaCostFromUrl(url) {
@@ -3155,28 +3618,363 @@
       });
     }
 
-    async function fetchJson(url) {
-      incrementDailyQuota(getQuotaCostFromUrl(url));
-      const response = await fetch(url);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const message = data?.error?.message || `HTTP ${response.status}`;
-        throw new Error(message);
+    function getLocalDayKey() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    }
+
+    function generateMemberId() {
+      const rand = Math.random().toString(36).slice(2, 8);
+      return `member_${rand}`;
+    }
+
+    function saveTeamApiKeys() {
+      safeSetLocalStorage(TEAM_API_KEYS_STORAGE, JSON.stringify(teamApiKeys), "team api keys");
+    }
+
+    function loadTeamApiKeys() {
+      const raw = localStorage.getItem(TEAM_API_KEYS_STORAGE);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          teamApiKeys = Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+          teamApiKeys = [];
+        }
       }
-      return data;
+      if (!teamApiKeys.length) {
+        const seeded = YOUTUBE_API_KEYS
+          .map((key) => String(key || "").trim())
+          .filter(Boolean)
+          .map((key, idx) => ({
+            key,
+            owner: `Team Member ${idx + 1}`,
+            addedAt: new Date().toISOString(),
+            quotaUsed: 0,
+            lastUsed: null,
+            failures: 0,
+            status: "active",
+            quotaDate: getLocalDayKey()
+          }));
+        teamApiKeys = seeded;
+        if (seeded.length) saveTeamApiKeys();
+      }
+      resetApiKeyQuotaIfNewDay();
+      renderApiKeyManagementTable();
+    }
+
+    function resetApiKeyQuotaIfNewDay() {
+      const today = getLocalDayKey();
+      let changed = false;
+      teamApiKeys.forEach((item) => {
+        if (item.quotaDate !== today) {
+          item.quotaDate = today;
+          item.quotaUsed = 0;
+          item.failures = 0;
+          if (item.status === "failed") item.status = "active";
+          changed = true;
+        }
+      });
+      if (changed) saveTeamApiKeys();
+    }
+
+    function getConfiguredAPIKeys() {
+      resetApiKeyQuotaIfNewDay();
+      const activeManaged = teamApiKeys
+        .filter((item) => item && String(item.key || "").trim())
+        .filter((item) => item.status !== "failed")
+        .map((item, index) => ({
+          key: String(item.key).trim(),
+          owner: item.owner || "Unknown",
+          source: "managed",
+          index
+        }));
+      const manualKey = String(apiKeyInput?.value || "").trim();
+      if (manualKey && !activeManaged.some((x) => x.key === manualKey)) {
+        activeManaged.push({ key: manualKey, owner: memberProfile.name || "Manual", source: "manual", index: -1 });
+      }
+      return activeManaged;
+    }
+
+    function hasConfiguredAPIKeys() {
+      return getConfiguredAPIKeys().length > 0;
+    }
+
+    function getAPIKeyIndex(apiKey) {
+      const keys = getConfiguredAPIKeys();
+      return keys.findIndex((item) => item.key === apiKey);
+    }
+
+    function trackQuotaUsage(keyIndex, units) {
+      if (!Number.isFinite(keyIndex) || keyIndex < 0) return;
+      const keys = getConfiguredAPIKeys();
+      const info = keys[keyIndex];
+      if (!info) return;
+      lastUsedAPIKeyIndex = keyIndex;
+
+      if (!apiKeyStats[keyIndex]) {
+        apiKeyStats[keyIndex] = { quotaUsed: 0, lastUsed: null };
+      }
+      apiKeyStats[keyIndex].quotaUsed += Number(units || 0);
+      apiKeyStats[keyIndex].lastUsed = new Date().toLocaleString();
+
+      if (info.source === "managed" && teamApiKeys[info.index]) {
+        teamApiKeys[info.index].quotaUsed = Number(teamApiKeys[info.index].quotaUsed || 0) + Number(units || 0);
+        teamApiKeys[info.index].lastUsed = new Date().toISOString();
+        saveTeamApiKeys();
+      }
+
+      renderApiKeyUsageDashboard();
+      renderApiKeyManagementTable();
+    }
+
+    function maskApiKey(value) {
+      const key = String(value || "").trim();
+      if (!key) return "-";
+      if (key.length <= 10) return `${key.slice(0, 2)}...${key.slice(-2)}`;
+      return `${key.slice(0, 6)}...${key.slice(-4)}`;
+    }
+
+    function renderApiKeyUsageDashboard() {
+      if (!apiKeyUsageSummary || !apiKeyUsageList) return;
+
+      const keys = getConfiguredAPIKeys();
+      const teamKeyCount = teamApiKeys.length;
+      const hasManualFallback = !!String(apiKeyInput?.value || "").trim();
+      apiKeyUsageSummary.textContent = `(configured: ${keys.length} | team: ${teamKeyCount}${hasManualFallback ? " + manual" : ""})`;
+
+      if (!keys.length) {
+        apiKeyUsageList.textContent = "No API keys configured yet.";
+        return;
+      }
+
+      const rows = keys.map((key, index) => {
+        const stats = apiKeyStats[index] || { quotaUsed: 0, lastUsed: null };
+        const marker = index === currentAPIKeyIndex ? " (next)" : "";
+        return `K${index + 1}${marker}: ${maskApiKey(key.key)} | owner: ${key.owner || "Unknown"} | quota: ${Number(stats.quotaUsed || 0)} | last used: ${stats.lastUsed || "-"}`;
+      });
+
+      apiKeyUsageList.innerHTML = rows.map((row) => `<div>${escapeHtml(row)}</div>`).join("");
+    }
+
+    function getNextAPIKey() {
+      const keys = getConfiguredAPIKeys();
+      if (!keys.length) {
+        throw new Error("No YouTube API key configured. Add keys in Settings > API Key Management or enter one in the API key field.");
+      }
+      if (currentAPIKeyIndex >= keys.length) currentAPIKeyIndex = 0;
+      const keyInfo = keys[currentAPIKeyIndex];
+      currentAPIKeyIndex = (currentAPIKeyIndex + 1) % keys.length;
+      console.log(`Rotating to API key index: ${currentAPIKeyIndex}`);
+      return keyInfo.key;
+    }
+
+    function getRandomAPIKey() {
+      const keys = getConfiguredAPIKeys();
+      if (!keys.length) {
+        throw new Error("No YouTube API key configured. Add keys in Settings > API Key Management or enter one in the API key field.");
+      }
+      const randomIndex = Math.floor(Math.random() * keys.length);
+      return keys[randomIndex].key;
+    }
+
+    function markApiKeyFailure(apiKey) {
+      const idx = teamApiKeys.findIndex((item) => item.key === apiKey);
+      if (idx < 0) return;
+      const item = teamApiKeys[idx];
+      item.failures = Number(item.failures || 0) + 1;
+      if (item.failures > 5) item.status = "failed";
+      saveTeamApiKeys();
+      renderApiKeyManagementTable();
+    }
+
+    function markApiKeySuccess(apiKey) {
+      const idx = teamApiKeys.findIndex((item) => item.key === apiKey);
+      if (idx < 0) return;
+      const item = teamApiKeys[idx];
+      item.failures = 0;
+      item.status = "active";
+      item.lastUsed = new Date().toISOString();
+      saveTeamApiKeys();
+      renderApiKeyManagementTable();
+    }
+
+    function loadMemberProfile() {
+      const raw = localStorage.getItem(MEMBER_PROFILE_STORAGE);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          memberProfile = {
+            memberId: parsed.memberId || "",
+            name: parsed.name || "",
+            googleSheetUrl: parsed.googleSheetUrl || localStorage.getItem(GOOGLE_SHEET_URL_STORAGE) || "",
+            autoSync: parsed.autoSync === true || localStorage.getItem(AUTO_SYNC_STORAGE) === "1"
+          };
+        } catch (_) {
+        }
+      }
+      if (!memberProfile.memberId) {
+        memberProfile.memberId = generateMemberId();
+      }
+      saveMemberProfile();
+    }
+
+    function saveMemberProfile() {
+      safeSetLocalStorage(MEMBER_PROFILE_STORAGE, JSON.stringify(memberProfile), "member profile");
+      safeSetLocalStorage(GOOGLE_SHEET_URL_STORAGE, memberProfile.googleSheetUrl || "", "google sheet url");
+      safeSetLocalStorage(AUTO_SYNC_STORAGE, memberProfile.autoSync ? "1" : "0", "auto sync");
+    }
+
+    function renderMemberProfileSettings() {
+      memberNameInput.value = memberProfile.name || "";
+      memberIdInput.value = memberProfile.memberId || "";
+      memberIdText.textContent = memberProfile.memberId || "-";
+      googleSheetUrlInput.value = memberProfile.googleSheetUrl || "";
+      autoSyncToggle.checked = !!memberProfile.autoSync;
+    }
+
+    function saveMemberProfileFromSettings() {
+      memberProfile.name = String(memberNameInput.value || "").trim();
+      memberProfile.googleSheetUrl = String(googleSheetUrlInput.value || "").trim();
+      memberProfile.autoSync = !!autoSyncToggle.checked;
+      saveMemberProfile();
+      renderMemberProfileSettings();
+      updateGoogleSheetConnectionStatus();
+      setupAutoSyncTimer();
+      showToast("Profile saved.");
+    }
+
+    function toggleAutoSync() {
+      memberProfile.autoSync = !!autoSyncToggle.checked;
+      saveMemberProfile();
+      setupAutoSyncTimer();
+      showToast(memberProfile.autoSync ? "Auto-sync enabled." : "Auto-sync disabled.");
+    }
+
+    function maskKeyForDisplay(key) {
+      const text = String(key || "").trim();
+      if (!text) return "-";
+      return `${text.slice(0, 8)}...`;
+    }
+
+    function renderApiKeyManagementTable() {
+      if (!apiKeyManagementBody) return;
+      apiKeyManagementBody.innerHTML = "";
+      if (!teamApiKeys.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="6" class="small-muted">No managed API keys. Add one above.</td>';
+        apiKeyManagementBody.appendChild(tr);
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      teamApiKeys.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        const statusText = item.status === "failed" ? "Failed ❌" : "Active ✅";
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${escapeHtml(maskKeyForDisplay(item.key))}</td>
+          <td>${escapeHtml(item.owner || "-")}</td>
+          <td>${escapeHtml(statusText)}</td>
+          <td>${Number(item.quotaUsed || 0).toLocaleString()} units</td>
+          <td><button class="btn btn-secondary" type="button" data-remove-api-key="${index}">Remove</button></td>
+        `;
+        fragment.appendChild(tr);
+      });
+      apiKeyManagementBody.appendChild(fragment);
+      renderTeamDashboard();
+    }
+
+    function addManagedApiKey() {
+      const key = String(newApiKeyInput.value || "").trim();
+      const owner = String(newApiKeyOwnerInput.value || "").trim() || (memberProfile.name || "Unknown");
+      if (!key) {
+        showToast("Enter a valid API key.");
+        return;
+      }
+      if (teamApiKeys.some((item) => item.key === key)) {
+        showToast("API key already exists.");
+        return;
+      }
+      teamApiKeys.push({
+        key,
+        owner,
+        addedAt: new Date().toISOString(),
+        quotaUsed: 0,
+        lastUsed: null,
+        failures: 0,
+        status: "active",
+        quotaDate: getLocalDayKey()
+      });
+      saveTeamApiKeys();
+      newApiKeyInput.value = "";
+      newApiKeyOwnerInput.value = "";
+      renderApiKeyManagementTable();
+      renderApiKeyUsageDashboard();
+      showToast("API key added.");
+    }
+
+    function handleApiKeyManagementActions(event) {
+      const removeBtn = event.target.closest("button[data-remove-api-key]");
+      if (!removeBtn) return;
+      const index = Number(removeBtn.getAttribute("data-remove-api-key"));
+      if (!Number.isInteger(index) || index < 0 || index >= teamApiKeys.length) return;
+      teamApiKeys.splice(index, 1);
+      saveTeamApiKeys();
+      renderApiKeyManagementTable();
+      renderApiKeyUsageDashboard();
+      showToast("API key removed.");
+    }
+
+    function withAPIKey(url, apiKey) {
+      const parsed = new URL(url);
+      parsed.searchParams.set("key", apiKey);
+      return parsed.toString();
+    }
+
+    async function fetchWithAPIKeyRotation(url, retryCount = 0) {
+      let requestUrl = url;
+      const parsed = new URL(requestUrl);
+      let activeKey = parsed.searchParams.get("key");
+      if (!activeKey) {
+        activeKey = getNextAPIKey();
+        requestUrl = withAPIKey(requestUrl, activeKey);
+      }
+
+      const quotaCost = getQuotaCostFromUrl(requestUrl);
+      incrementDailyQuota(quotaCost);
+      trackQuotaUsage(getAPIKeyIndex(activeKey), quotaCost);
+
+      try {
+        const response = await fetch(requestUrl);
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = data?.error?.message || `HTTP ${response.status}`;
+          markApiKeyFailure(activeKey);
+          if (retryCount < 3) {
+            const nextUrl = withAPIKey(requestUrl, getRandomAPIKey());
+            return fetchWithAPIKeyRotation(nextUrl, retryCount + 1);
+          }
+          throw new Error(`API Error: ${message}`);
+        }
+        markApiKeySuccess(activeKey);
+        return data;
+      } catch (error) {
+        markApiKeyFailure(activeKey);
+        if (retryCount < 3) {
+          const nextUrl = withAPIKey(requestUrl, getRandomAPIKey());
+          return fetchWithAPIKeyRotation(nextUrl, retryCount + 1);
+        }
+        throw error;
+      }
+    }
+
+    async function fetchJson(url) {
+      return fetchWithAPIKeyRotation(url);
     }
 
     async function fetchJsonLogged(url, label) {
       console.log(`${label}: API URL: ${url}`);
-      incrementDailyQuota(getQuotaCostFromUrl(url));
-      const response = await fetch(url);
-      console.log(`${label}: Response status: ${response.status}`);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const message = data?.error?.message || `HTTP ${response.status}`;
-        console.error(`${label}: API error`, { status: response.status, message, data });
-        throw new Error(message);
-      }
+      const data = await fetchWithAPIKeyRotation(url);
       const count = Array.isArray(data.items) ? data.items.length : 0;
       console.log(`${label}: Results count: ${count}`);
       if (Object.prototype.hasOwnProperty.call(data, "nextPageToken")) {
@@ -3186,7 +3984,11 @@
     }
 
     function buildUrl(path, params) {
-      const query = new URLSearchParams(params);
+      const safeParams = { ...(params || {}) };
+      if (!safeParams.key) {
+        safeParams.key = getNextAPIKey();
+      }
+      const query = new URLSearchParams(safeParams);
       return `${API_BASE}/${path}?${query.toString()}`;
     }
 
@@ -3230,24 +4032,6 @@
     function saveSeenVideosMap(mapObj) {
       const payload = mapObj && typeof mapObj === "object" ? mapObj : {};
       safeSetLocalStorage(SEEN_VIDEOS_STORAGE, JSON.stringify(payload), "seen videos map");
-    }
-
-    function getProxyPreferenceStorageKey(channelId) {
-      return `proxy_preference_${channelId}`;
-    }
-
-    function getProxyPreference(channelId) {
-      const raw = localStorage.getItem(getProxyPreferenceStorageKey(channelId));
-      const idx = Number(raw);
-      return Number.isInteger(idx) && idx >= 0 && idx < CORS_PROXIES.length ? idx : 0;
-    }
-
-    function setProxyPreference(channelId, proxyIndex) {
-      safeSetLocalStorage(getProxyPreferenceStorageKey(channelId), String(proxyIndex), "proxy preference");
-    }
-
-    function clearProxyPreference(channelId) {
-      safeRemoveLocalStorage(getProxyPreferenceStorageKey(channelId));
     }
 
     function loadSeenVideosForChannel(channelId) {
@@ -3297,6 +4081,7 @@
     function saveTrackedChannels() {
       const ok = safeSetLocalStorage(TRACKED_CHANNELS_STORAGE, JSON.stringify(trackedChannels), "tracked channels");
       if (ok) warnIfStorageNearLimit();
+      scheduleSyncSoon();
     }
 
     function loadTrackedChannels() {
@@ -3310,9 +4095,8 @@
         trackedChannels = parsed && typeof parsed === "object" ? parsed : {};
         Object.values(trackedChannels).forEach((channel) => {
           channel.nicheKeyword = normalizeNicheTag(channel.nicheKeyword);
-          channel.rssLastChecked = channel.rssLastChecked || null;
-          channel.rssLastSuccess = channel.rssLastSuccess !== false;
-          channel.rssConsecutiveFailures = Number(channel.rssConsecutiveFailures || 0);
+          channel.status = channel.status || "idle";
+          channel.consecutiveFailures = Number(channel.consecutiveFailures || 0);
           if (Array.isArray(channel.seenVideoIds) && channel.seenVideoIds.length) {
             saveSeenVideosForChannel(channel.channelId, channel.seenVideoIds);
             delete channel.seenVideoIds;
@@ -3327,6 +4111,8 @@
       alertHistory = alertHistory.slice(0, 200);
       const ok = safeSetLocalStorage(ALERT_HISTORY_STORAGE, JSON.stringify(alertHistory), "alert history");
       if (ok) warnIfStorageNearLimit();
+      renderAlertsPage();
+      scheduleSyncSoon();
     }
 
     function loadAlertHistory() {
@@ -3367,13 +4153,13 @@
         try {
           const parsed = JSON.parse(raw);
           autoCheckConfig.enabled = !!parsed.enabled;
-          autoCheckConfig.intervalMs = Number(parsed.intervalMs || 180000);
+          autoCheckConfig.intervalMs = Number(parsed.intervalMs || ULTRA_CHECK_INTERVAL_MS);
           autoCheckConfig.alertWindowMs = Number(parsed.alertWindowMs || DEFAULT_ALERT_WINDOW_MS);
         } catch (_) {
         }
       }
       if (![30000, 60000, 120000, 180000, 300000, 600000, 900000, 1800000].includes(autoCheckConfig.intervalMs)) {
-        autoCheckConfig.intervalMs = 180000;
+        autoCheckConfig.intervalMs = ULTRA_CHECK_INTERVAL_MS;
       }
       if (!ALERT_WINDOW_OPTIONS.includes(autoCheckConfig.alertWindowMs)) {
         autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
@@ -3482,18 +4268,19 @@
     }
 
     function getChannelStatusInfo(channel) {
-      if (!channel?.rssLastChecked) return { cls: "gray", label: "Not checked recently", title: "" };
-      if (channel.rssLastSuccess === false) {
+      if (!channel?.lastChecked) return { cls: "gray", label: "Not checked", title: "" };
+      if (channel.status === "failed") {
+        const fails = Number(channel.consecutiveFailures || 0);
         return {
           cls: "red",
-          label: "RSS failed",
-          title: "RSS check failed - use Check Now button for this channel"
+          label: fails > 0 ? `Failed (${fails})` : "Failed",
+          title: "PlaylistItems API check failed"
         };
       }
-      const diff = Date.now() - new Date(channel.rssLastChecked).getTime();
-      if (diff <= 5 * 60 * 1000) return { cls: "green", label: "Checked < 5 min", title: "" };
-      if (diff <= 60 * 60 * 1000) return { cls: "yellow", label: "Checked < 1 hour", title: "" };
-      return { cls: "gray", label: "Not checked recently", title: "" };
+      if (channel.status === "success") {
+        return { cls: "green", label: "Success", title: "PlaylistItems API check succeeded" };
+      }
+      return { cls: "gray", label: "Pending", title: "" };
     }
 
     function formatRelativeTime(isoDate) {
@@ -3549,8 +4336,8 @@
       channels.forEach((channel) => {
         const niche = normalizeNicheTag(channel.nicheKeyword);
         const status = getChannelStatusInfo(channel);
-        const rssWarning = Number(channel.rssConsecutiveFailures || 0) >= 5
-          ? '<span title="RSS unreliable for this channel - auto-track may miss uploads. Use Check Now for reliable results." style="margin-left:6px;color:#ffb675;">⚠</span>'
+        const apiWarning = Number(channel.consecutiveFailures || 0) >= 3
+          ? '<span title="Recent PlaylistItems API failures detected." style="margin-left:6px;color:#ffb675;">⚠</span>'
           : "";
         const expanded = trackerExpandedRows[channel.channelId];
         const optionHtml = allGroups.map((name) => {
@@ -3563,7 +4350,7 @@
         const row = document.createElement("tr");
         row.setAttribute("data-channel-row", channel.channelId);
         row.innerHTML = `
-          <td><a href="https://www.youtube.com/channel/${channel.channelId}" target="_blank" rel="noopener noreferrer">${escapeHtml(channel.channelTitle)}</a>${rssWarning}</td>
+          <td><a href="https://www.youtube.com/channel/${channel.channelId}" target="_blank" rel="noopener noreferrer">${escapeHtml(channel.channelTitle)}</a>${apiWarning}</td>
           <td>${escapeHtml(channel.country || "-")}</td>
           <td>${formatNumber(channel.subscriberCount)}</td>
           <td><select data-change-niche="${channel.channelId}">${optionHtml}</select></td>
@@ -3684,7 +4471,6 @@
         delete trackedChannels[channelId];
         delete trackerExpandedRows[channelId];
         clearSeenVideosForChannel(channelId);
-        clearProxyPreference(channelId);
         saveTrackedChannels();
         renderTrackedChannels();
         showToast("Channel removed from tracker.");
@@ -3779,7 +4565,6 @@
           delete trackedChannels[channel.channelId];
           delete trackerExpandedRows[channel.channelId];
           clearSeenVideosForChannel(channel.channelId);
-          clearProxyPreference(channel.channelId);
         }
       });
       trackerActiveNiche = "All Channels";
@@ -3799,6 +4584,7 @@
       alertHistory = [];
       saveAlertHistory();
       renderAlertHistory();
+      renderAlertsPage();
       showToast("Alert history cleared.");
     }
 
@@ -3827,6 +4613,496 @@
       URL.revokeObjectURL(url);
     }
 
+    function renderAlertsPage() {
+      if (!alertsPageBody || !alertsPageCount) return;
+      alertsPageBody.innerHTML = "";
+      const items = [...alertHistory].sort((a, b) => new Date(b.detectedAt || 0).getTime() - new Date(a.detectedAt || 0).getTime());
+      alertsPageCount.textContent = String(items.length);
+      if (!items.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="4" class="small-muted">No alerts yet.</td>';
+        alertsPageBody.appendChild(tr);
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      items.forEach((item) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(formatDateTime(item.detectedAt))}</td>
+          <td>${escapeHtml(item.channelTitle || "-")}</td>
+          <td>${escapeHtml(item.videoTitle || "-")}</td>
+          <td>${escapeHtml(normalizeNicheTag(item.nicheKeyword || ""))}</td>
+        `;
+        fragment.appendChild(tr);
+      });
+      alertsPageBody.appendChild(fragment);
+    }
+
+    function getGoogleSheetEndpoint() {
+      return String(memberProfile.googleSheetUrl || googleSheetUrlInput.value || "").trim();
+    }
+
+    function updateGoogleSheetConnectionStatus(connected = null) {
+      if (!googleSheetStatus) return;
+      const endpoint = getGoogleSheetEndpoint();
+      let ok = connected;
+      if (ok === null) ok = !!endpoint;
+      googleSheetStatus.textContent = ok ? "Connected ✅" : "Not Connected ❌";
+      googleSheetStatus.style.color = ok ? "#22c55e" : "";
+    }
+
+    function loadSyncActivityLog() {
+      const raw = localStorage.getItem(SYNC_ACTIVITY_LOG_STORAGE);
+      if (!raw) {
+        syncActivityEntries = [];
+        return;
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        syncActivityEntries = Array.isArray(parsed) ? parsed.slice(0, 20) : [];
+      } catch (_) {
+        syncActivityEntries = [];
+      }
+    }
+
+    function saveSyncActivityLog() {
+      syncActivityEntries = syncActivityEntries.slice(0, 20);
+      safeSetLocalStorage(SYNC_ACTIVITY_LOG_STORAGE, JSON.stringify(syncActivityEntries), "sync activity log");
+    }
+
+    function addSyncActivityEntry(action, status, detail) {
+      syncActivityEntries.unshift({
+        at: new Date().toISOString(),
+        action: String(action || "sync"),
+        status: String(status || "info"),
+        detail: String(detail || "")
+      });
+      saveSyncActivityLog();
+      renderSyncActivityLog();
+    }
+
+    function clearSyncActivityLog() {
+      syncActivityEntries = [];
+      saveSyncActivityLog();
+      renderSyncActivityLog();
+      showToast("Sync activity log cleared.");
+    }
+
+    function getFilteredSyncActivityEntries() {
+      if (syncActivityFilterValue === "all") return syncActivityEntries;
+      return syncActivityEntries.filter((entry) => String(entry.status || "").toLowerCase() === syncActivityFilterValue);
+    }
+
+    function exportSyncActivityCsv() {
+      const items = getFilteredSyncActivityEntries();
+      if (!items.length) {
+        showToast("No sync activity entries to export.");
+        return;
+      }
+      const header = ["Timestamp", "Action", "Status", "Detail"];
+      const rows = items.map((entry) => [
+        entry.at || "",
+        entry.action || "",
+        entry.status || "",
+        entry.detail || ""
+      ]);
+      const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "sync_activity_log.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function renderSyncActivityLog() {
+      if (!syncActivityLog || !syncActivityCount) return;
+      syncActivityLog.innerHTML = "";
+      const filtered = getFilteredSyncActivityEntries();
+      syncActivityCount.textContent = String(filtered.length);
+      if (!filtered.length) {
+        const li = document.createElement("li");
+        li.className = "alert-item";
+        li.textContent = "No sync activity for current filter.";
+        syncActivityLog.appendChild(li);
+        return;
+      }
+      const fragment = document.createDocumentFragment();
+      filtered.forEach((entry) => {
+        const li = document.createElement("li");
+        li.className = "alert-item";
+        const statusText = entry.status === "success" ? "SUCCESS" : entry.status === "error" ? "ERROR" : "INFO";
+        li.innerHTML = `
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <strong>${escapeHtml(statusText)}: ${escapeHtml(entry.action)}</strong>
+            <span class="small-muted">${escapeHtml(formatDateTime(entry.at))}</span>
+          </div>
+          <div class="small-muted" style="margin-top:4px;">${escapeHtml(entry.detail || "-")}</div>
+        `;
+        fragment.appendChild(li);
+      });
+      syncActivityLog.appendChild(fragment);
+    }
+
+    async function testGoogleSheetConnection() {
+      const endpoint = getGoogleSheetEndpoint();
+      if (!endpoint) {
+        updateGoogleSheetConnectionStatus(false);
+        addSyncActivityEntry("test_connection", "error", "Missing Google Apps Script URL.");
+        showToast("Add your Google Apps Script URL first.");
+        return;
+      }
+      try {
+        const response = await fetch(`${endpoint}${endpoint.includes("?") ? "&" : "?"}ping=1`, { method: "GET" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        updateGoogleSheetConnectionStatus(true);
+        addSyncActivityEntry("test_connection", "success", "Connection test succeeded.");
+        showToast("Google Sheets connection is working.");
+      } catch (error) {
+        updateGoogleSheetConnectionStatus(false);
+        addSyncActivityEntry("test_connection", "error", error.message || "Connection test failed.");
+        showToast(`Connection failed: ${error.message}`);
+      }
+    }
+
+    function setupAutoSyncTimer() {
+      if (autoSyncTimer) {
+        clearInterval(autoSyncTimer);
+        autoSyncTimer = null;
+      }
+      if (!memberProfile.autoSync || !getGoogleSheetEndpoint()) return;
+      autoSyncTimer = setInterval(() => {
+        syncToGoogleSheet({ silent: true });
+      }, 5 * 60 * 1000);
+    }
+
+    function scheduleSyncSoon() {
+      if (!memberProfile.autoSync) return;
+      if (!getGoogleSheetEndpoint()) return;
+      if (autoSyncPendingTimer) {
+        clearTimeout(autoSyncPendingTimer);
+      }
+      autoSyncPendingTimer = setTimeout(() => {
+        autoSyncPendingTimer = null;
+        syncToGoogleSheet({ silent: true });
+      }, 2000);
+    }
+
+    async function postSheetAction(endpoint, payload) {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json().catch(() => ({}));
+    }
+
+    function buildMemberSyncPayload() {
+      const trackedList = Object.values(trackedChannels);
+      const nicheSet = new Set(trackedList.map((ch) => normalizeNicheTag(ch.nicheKeyword)).filter(Boolean));
+      const alertsToday = alertHistory.filter((item) => getLocalDateKey(new Date(item.detectedAt || 0)) === getLocalDateKey(new Date())).length;
+      return {
+        action: "sync_member",
+        memberData: {
+          memberId: memberProfile.memberId || generateMemberId(),
+          name: memberProfile.name || "Unknown",
+          apiKey: getConfiguredAPIKeys()[0]?.key || "",
+          trackedChannelsCount: trackedList.length,
+          nichesTracking: Array.from(nicheSet).join(", "),
+          lastActive: new Date().toISOString(),
+          alertsToday
+        }
+      };
+    }
+
+    function buildChannelsSyncPayload() {
+      return {
+        action: "sync_channels",
+        memberId: memberProfile.memberId,
+        memberName: memberProfile.name || "Unknown",
+        channels: Object.values(trackedChannels).map((ch) => ({
+          channelTitle: ch.channelTitle || "",
+          channelId: ch.channelId || "",
+          subscriberCount: Number(ch.subscriberCount || 0),
+          nicheKeyword: normalizeNicheTag(ch.nicheKeyword || "Uncategorized"),
+          dateAdded: ch.dateAdded || "",
+          lastChecked: ch.lastChecked || ""
+        }))
+      };
+    }
+
+    function buildAlertsSyncPayload() {
+      return {
+        action: "sync_alerts",
+        memberId: memberProfile.memberId,
+        memberName: memberProfile.name || "Unknown",
+        alerts: alertHistory.slice(0, 100).map((item) => ({
+          timestamp: item.detectedAt || "",
+          channelTitle: item.channelTitle || "",
+          videoTitle: item.videoTitle || "",
+          videoId: item.videoId || extractVideoIdFromUrl(item.videoUrl || ""),
+          niche: normalizeNicheTag(item.nicheKeyword || "")
+        }))
+      };
+    }
+
+    async function syncToGoogleSheet(options = {}) {
+      const { silent = false } = options;
+      const endpoint = getGoogleSheetEndpoint();
+      if (!endpoint) {
+        if (!silent) showToast("Set Google Apps Script URL in Settings first.");
+        addSyncActivityEntry("sync", "error", "Sync skipped: missing Google Apps Script URL.");
+        updateGoogleSheetConnectionStatus(false);
+        return;
+      }
+      try {
+        memberProfile.googleSheetUrl = endpoint;
+        if (!memberProfile.memberId) memberProfile.memberId = generateMemberId();
+        saveMemberProfile();
+        if (teamDashboardStatus) teamDashboardStatus.textContent = "Syncing to Google Sheets...";
+
+        await postSheetAction(endpoint, buildMemberSyncPayload());
+        await postSheetAction(endpoint, buildChannelsSyncPayload());
+        await postSheetAction(endpoint, buildAlertsSyncPayload());
+
+        updateGoogleSheetConnectionStatus(true);
+        const stamp = new Date().toLocaleTimeString();
+        if (teamDashboardStatus) teamDashboardStatus.textContent = `Synced at ${stamp}.`;
+        addSyncActivityEntry("sync", "success", "Member, channels, and alerts synced to Google Sheets.");
+        if (!silent) showToast("Synced to Google Sheets.");
+      } catch (error) {
+        updateGoogleSheetConnectionStatus(false);
+        if (teamDashboardStatus) teamDashboardStatus.textContent = `Sync failed: ${error.message}`;
+        addSyncActivityEntry("sync", "error", error.message || "Sync failed.");
+        if (!silent) showToast(`Sync failed: ${error.message}`);
+      }
+    }
+
+    function buildLocalTeamDashboardData() {
+      const memberName = memberProfile.name || "Current Member";
+      const channels = Object.values(trackedChannels).map((ch) => ({
+        "Member ID": memberProfile.memberId,
+        "Member Name": memberName,
+        "Channel Name": ch.channelTitle || "",
+        "Channel ID": ch.channelId || "",
+        Subscribers: Number(ch.subscriberCount || 0),
+        Niche: normalizeNicheTag(ch.nicheKeyword || "Uncategorized"),
+        "Date Added": ch.dateAdded || "",
+        "Last Checked": ch.lastChecked || ""
+      }));
+      const alerts = alertHistory.slice(0, 100).map((item) => ({
+        "Member ID": memberProfile.memberId,
+        "Member Name": memberName,
+        Timestamp: item.detectedAt || "",
+        Channel: item.channelTitle || "",
+        "Video Title": item.videoTitle || "",
+        "Video ID": item.videoId || extractVideoIdFromUrl(item.videoUrl || ""),
+        Niche: normalizeNicheTag(item.nicheKeyword || "")
+      }));
+      const alertsToday = alerts.filter((item) => getLocalDateKey(new Date(item.Timestamp || 0)) === getLocalDateKey(new Date())).length;
+      return {
+        members: [{
+          "Member ID": memberProfile.memberId,
+          Name: memberName,
+          "Tracked Channels": channels.length,
+          Niches: Array.from(new Set(channels.map((c) => c.Niche))).join(", "),
+          "Last Active": new Date().toISOString(),
+          "Alerts Today": alertsToday,
+          Status: "active"
+        }],
+        channels,
+        alerts
+      };
+    }
+
+    async function fetchDashboardData(options = {}) {
+      const { silent = false } = options;
+      const endpoint = getGoogleSheetEndpoint();
+      if (!endpoint) {
+        teamDashboardData = buildLocalTeamDashboardData();
+        renderTeamDashboard();
+        addSyncActivityEntry("dashboard_fetch", "info", "No sheet URL set; showing local dashboard data.");
+        if (teamDashboardStatus) teamDashboardStatus.textContent = "Showing local dashboard data.";
+        return;
+      }
+      try {
+        if (teamDashboardStatus) teamDashboardStatus.textContent = "Loading team dashboard...";
+        const url = `${endpoint}${endpoint.includes("?") ? "&" : "?"}t=${Date.now()}`;
+        const response = await fetch(url, { method: "GET" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json().catch(() => ({}));
+        teamDashboardData = {
+          members: Array.isArray(data.members) ? data.members : [],
+          channels: Array.isArray(data.channels) ? data.channels : [],
+          alerts: Array.isArray(data.alerts) ? data.alerts : []
+        };
+        renderTeamDashboard();
+        updateGoogleSheetConnectionStatus(true);
+        addSyncActivityEntry("dashboard_fetch", "success", "Team dashboard loaded from Google Sheets.");
+        if (teamDashboardStatus) teamDashboardStatus.textContent = `Dashboard updated at ${new Date().toLocaleTimeString()}.`;
+      } catch (error) {
+        teamDashboardData = buildLocalTeamDashboardData();
+        renderTeamDashboard();
+        updateGoogleSheetConnectionStatus(false);
+        addSyncActivityEntry("dashboard_fetch", "error", `Fallback to local data: ${error.message || "Unknown error"}`);
+        if (teamDashboardStatus) teamDashboardStatus.textContent = `Dashboard fallback to local data (${error.message}).`;
+        if (!silent) showToast(`Dashboard fetch failed: ${error.message}`);
+      }
+    }
+
+    function readField(obj, keys, fallback = "") {
+      for (const key of keys) {
+        if (obj && Object.prototype.hasOwnProperty.call(obj, key) && obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+          return obj[key];
+        }
+      }
+      return fallback;
+    }
+
+    function renderTeamDashboard() {
+      const members = Array.isArray(teamDashboardData.members) ? teamDashboardData.members : [];
+      const channels = Array.isArray(teamDashboardData.channels) ? teamDashboardData.channels : [];
+      const alerts = Array.isArray(teamDashboardData.alerts) ? teamDashboardData.alerts : [];
+
+      const memberNames = Array.from(new Set(channels.map((row) => String(readField(row, ["Member Name", "Member", "name"], "")).trim()).filter(Boolean))).sort();
+      const nicheNames = Array.from(new Set(channels.map((row) => normalizeNicheTag(readField(row, ["Niche", "nicheKeyword", "niche"], "")).trim()).filter(Boolean))).sort();
+
+      const selectedMember = String(teamFilterMember.value || "").trim();
+      const selectedNiche = String(teamFilterNiche.value || "").trim();
+
+      teamFilterMember.innerHTML = '<option value="">All Members</option>';
+      memberNames.forEach((name) => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        if (name === selectedMember) opt.selected = true;
+        teamFilterMember.appendChild(opt);
+      });
+
+      teamFilterNiche.innerHTML = '<option value="">All Niches</option>';
+      nicheNames.forEach((niche) => {
+        const opt = document.createElement("option");
+        opt.value = niche;
+        opt.textContent = niche;
+        if (niche === selectedNiche) opt.selected = true;
+        teamFilterNiche.appendChild(opt);
+      });
+
+      const filteredChannels = channels.filter((row) => {
+        const member = String(readField(row, ["Member Name", "Member", "name"], "")).trim();
+        const niche = normalizeNicheTag(readField(row, ["Niche", "nicheKeyword", "niche"], ""));
+        if (selectedMember && member !== selectedMember) return false;
+        if (selectedNiche && niche !== selectedNiche) return false;
+        return true;
+      });
+
+      const todayKey = getLocalDateKey(new Date());
+      const alertsTodayCount = alerts.filter((row) => getLocalDateKey(new Date(readField(row, ["Timestamp", "timestamp", "detectedAt"], 0))) === todayKey).length;
+      const totalNiches = new Set(channels.map((row) => normalizeNicheTag(readField(row, ["Niche", "nicheKeyword", "niche"], ""))).filter(Boolean)).size;
+      const activeKeys = teamApiKeys.filter((item) => item.status !== "failed").length;
+
+      teamTotalMembers.textContent = String(new Set([
+        ...members.map((row) => String(readField(row, ["Name", "Member", "name"], "")).trim()).filter(Boolean),
+        ...channels.map((row) => String(readField(row, ["Member Name", "Member", "name"], "")).trim()).filter(Boolean)
+      ]).size);
+      teamTotalChannels.textContent = String(channels.length);
+      teamTotalNiches.textContent = String(totalNiches);
+      teamAlertsToday.textContent = String(alertsTodayCount);
+      teamApiKeysActive.textContent = `${activeKeys}/${teamApiKeys.length}`;
+
+      teamMembersBody.innerHTML = "";
+      if (members.length) {
+        const fragment = document.createDocumentFragment();
+        members.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(String(readField(row, ["Name", "Member", "Member Name", "name"], "-")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Tracked Channels", "trackedChannelsCount"], "0")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Niches", "nichesTracking"], "-")))}</td>
+            <td>${escapeHtml(formatDateTime(readField(row, ["Last Active", "lastActive"], "")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Alerts Today", "alertsToday"], "0")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Status", "status"], "active")))}</td>
+          `;
+          fragment.appendChild(tr);
+        });
+        teamMembersBody.appendChild(fragment);
+      } else {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="6" class="small-muted">No member records available.</td>';
+        teamMembersBody.appendChild(tr);
+      }
+
+      teamChannelsBody.innerHTML = "";
+      if (filteredChannels.length) {
+        const fragment = document.createDocumentFragment();
+        filteredChannels.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(String(readField(row, ["Member Name", "Member", "name"], "-")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Channel Name", "channelTitle", "title"], "-")))}</td>
+            <td>${escapeHtml(formatNumber(readField(row, ["Subscribers", "subscriberCount"], 0)))}</td>
+            <td>${escapeHtml(String(normalizeNicheTag(readField(row, ["Niche", "nicheKeyword", "niche"], ""))))}</td>
+            <td>${escapeHtml(formatDate(readField(row, ["Date Added", "dateAdded"], "")))}</td>
+            <td>${escapeHtml(formatDateTime(readField(row, ["Last Checked", "lastChecked"], "")))}</td>
+          `;
+          fragment.appendChild(tr);
+        });
+        teamChannelsBody.appendChild(fragment);
+      } else {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="6" class="small-muted">No channels match selected filters.</td>';
+        teamChannelsBody.appendChild(tr);
+      }
+
+      teamAlertsBody.innerHTML = "";
+      const recentAlerts = alerts.slice(0, 50);
+      if (recentAlerts.length) {
+        const fragment = document.createDocumentFragment();
+        recentAlerts.forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(formatDateTime(readField(row, ["Timestamp", "timestamp", "detectedAt"], "")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Member Name", "Member", "name"], "-")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Channel", "channelTitle"], "-")))}</td>
+            <td>${escapeHtml(String(readField(row, ["Video Title", "videoTitle"], "-")))}</td>
+            <td>${escapeHtml(String(normalizeNicheTag(readField(row, ["Niche", "nicheKeyword", "niche"], ""))))}</td>
+          `;
+          fragment.appendChild(tr);
+        });
+        teamAlertsBody.appendChild(fragment);
+      } else {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="5" class="small-muted">No alerts recorded.</td>';
+        teamAlertsBody.appendChild(tr);
+      }
+
+      teamApiHealthBody.innerHTML = "";
+      if (teamApiKeys.length) {
+        const fragment = document.createDocumentFragment();
+        teamApiKeys.forEach((item, index) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${index + 1}</td>
+            <td>${escapeHtml(maskKeyForDisplay(item.key))}</td>
+            <td>${escapeHtml(item.owner || "-")}</td>
+            <td>${escapeHtml(formatNumber(item.quotaUsed || 0))}</td>
+            <td>${escapeHtml(String(Number(item.failures || 0)))}</td>
+            <td>${escapeHtml(item.status === "failed" ? "Failed ❌" : "Active ✅")}</td>
+          `;
+          fragment.appendChild(tr);
+        });
+        teamApiHealthBody.appendChild(fragment);
+      } else {
+        const tr = document.createElement("tr");
+        tr.innerHTML = '<td colspan="6" class="small-muted">No API keys configured.</td>';
+        teamApiHealthBody.appendChild(tr);
+      }
+    }
+
     function getUploadsPlaylistId(channelId) {
       const id = String(channelId || "").trim();
       if (id.startsWith("UC") && id.length >= 3) {
@@ -3836,16 +5112,14 @@
     }
 
     async function fetchLatestUploadsByApi(channelId) {
-      const apiKey = apiKeyInput.value.trim();
-      if (!apiKey) {
-        throw new Error("Missing API key. Enter your YouTube API key first.");
+      if (!hasConfiguredAPIKeys()) {
+        throw new Error("Missing API key pool. Add keys in YOUTUBE_API_KEYS or API key input.");
       }
       const uploadsPlaylistId = getUploadsPlaylistId(channelId);
       const url = buildUrl("playlistItems", {
         part: "snippet",
         playlistId: uploadsPlaylistId,
-        maxResults: "5",
-        key: apiKey
+        maxResults: "5"
       });
       const data = await fetchJson(url);
       const items = Array.isArray(data.items) ? data.items : [];
@@ -4024,12 +5298,12 @@
 
     function startBackgroundChecks() {
       autoCheckConfig.enabled = true;
-      autoCheckConfig.intervalMs = 180000;
+      autoCheckConfig.intervalMs = ULTRA_CHECK_INTERVAL_MS;
       if (!ALERT_WINDOW_OPTIONS.includes(Number(autoCheckConfig.alertWindowMs))) {
         autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
       }
       autoCheckToggle.checked = true;
-      autoCheckInterval.value = "180000";
+      autoCheckInterval.value = String(ULTRA_CHECK_INTERVAL_MS);
       alertWindowSelect.value = String(autoCheckConfig.alertWindowMs);
       updateUltraModeBadge();
       saveAutoCheckConfig();
@@ -4149,9 +5423,8 @@
         dateAdded: new Date().toISOString(),
         lastChecked: null,
         channelThumbnail: channelData.channelThumbnail || "",
-        rssLastChecked: null,
-        rssLastSuccess: true,
-        rssConsecutiveFailures: 0
+        status: "idle",
+        consecutiveFailures: 0
       };
       saveSeenVideosForChannel(channelId, seenVideoIds);
       saveTrackedChannels();
@@ -4191,11 +5464,10 @@
       showToast(addedCount > 0 ? `${addedCount} channels added to tracker.` : "Selected channels were already tracked.");
     }
 
-    async function fetchChannelMetadataById(channelId, apiKey) {
+    async function fetchChannelMetadataById(channelId) {
       const url = buildUrl("channels", {
         part: "snippet,statistics",
-        id: channelId,
-        key: apiKey
+        id: channelId
       });
       const data = await fetchJson(url);
       const item = Array.isArray(data.items) ? data.items[0] : null;
@@ -4234,7 +5506,7 @@
       return { kind: "query", value: input };
     }
 
-    async function resolveChannelIdFromInput(rawInput, apiKey) {
+    async function resolveChannelIdFromInput(rawInput) {
       const parsed = parseChannelInput(rawInput);
       if (!parsed.value) return "";
       if (parsed.kind === "id") return parsed.value;
@@ -4242,8 +5514,7 @@
       if (parsed.kind === "handle") {
         const handleUrl = buildUrl("channels", {
           part: "id",
-          forHandle: parsed.value,
-          key: apiKey
+          forHandle: parsed.value
         });
         const handleData = await fetchJson(handleUrl);
         const handleItem = Array.isArray(handleData.items) ? handleData.items[0] : null;
@@ -4253,8 +5524,7 @@
       if (parsed.kind === "username") {
         const userUrl = buildUrl("channels", {
           part: "id",
-          forUsername: parsed.value,
-          key: apiKey
+          forUsername: parsed.value
         });
         const userData = await fetchJson(userUrl);
         const userItem = Array.isArray(userData.items) ? userData.items[0] : null;
@@ -4265,8 +5535,7 @@
         part: "snippet",
         type: "channel",
         maxResults: "1",
-        q: parsed.value,
-        key: apiKey
+        q: parsed.value
       });
       const searchData = await fetchJson(searchUrl);
       const searchItem = Array.isArray(searchData.items) ? searchData.items[0] : null;
@@ -4276,18 +5545,17 @@
     async function addChannelManuallyPrompt() {
       const raw = prompt("Enter YouTube channel ID or channel URL");
       const nicheTag = normalizeNicheTag(prompt("Enter niche/keyword tag", "Uncategorized"));
-      const apiKey = apiKeyInput.value.trim();
-      if (!apiKey) {
-        showToast("API key is required for manual add.");
+      if (!hasConfiguredAPIKeys()) {
+        showToast("Add at least one API key in YOUTUBE_API_KEYS or the API key field first.");
         return;
       }
       try {
-        const channelId = await resolveChannelIdFromInput(raw, apiKey);
+        const channelId = await resolveChannelIdFromInput(raw);
         if (!channelId) {
           showToast("Invalid channel ID or URL.");
           return;
         }
-        const metadata = await fetchChannelMetadataById(channelId, apiKey);
+        const metadata = await fetchChannelMetadataById(channelId);
         const added = await addChannelToTracker(metadata, nicheTag);
         renderTrackedChannels();
         if (!added) showToast("Channel is already tracked.");
@@ -4296,141 +5564,137 @@
       }
     }
 
-    function getFetchTimeoutSignal(ms) {
-      if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
-        return AbortSignal.timeout(ms);
-      }
-      const controller = new AbortController();
-      setTimeout(() => controller.abort(), ms);
-      return controller.signal;
-    }
-
-    function parseRssEntries(xmlText) {
-      const doc = new DOMParser().parseFromString(xmlText, "text/xml");
-      if (doc.querySelector("parsererror")) {
-        return [];
-      }
-      const atomNs = "http://www.w3.org/2005/Atom";
-      const ytNs = "http://www.youtube.com/xml/schemas/2015";
-      const entries = Array.from(doc.getElementsByTagNameNS(atomNs, "entry"));
-      const fallbackEntries = entries.length ? entries : Array.from(doc.getElementsByTagName("entry"));
-      return fallbackEntries.map((entry) => {
-        const videoIdNode = entry.getElementsByTagNameNS(ytNs, "videoId")[0] || entry.getElementsByTagName("yt:videoId")[0];
-        const titleNode = entry.getElementsByTagNameNS(atomNs, "title")[0] || entry.getElementsByTagName("title")[0];
-        const publishedNode = entry.getElementsByTagNameNS(atomNs, "published")[0] || entry.getElementsByTagName("published")[0];
-        const videoId = String(videoIdNode?.textContent || "").trim();
-        return {
-          videoId,
-          title: String(titleNode?.textContent || "Untitled").trim(),
-          publishedAt: String(publishedNode?.textContent || "").trim(),
-          videoUrl: videoId ? `https://www.youtube.com/watch?v=${videoId}` : ""
-        };
-      }).filter((entry) => entry.videoId);
-    }
-
-    async function fetchWithProxyFallback(url, channelId) {
-      const preferred = getProxyPreference(channelId);
-      const order = [preferred, ...Array.from({ length: CORS_PROXIES.length }, (_, i) => i).filter((i) => i !== preferred)];
-      for (let k = 0; k < order.length; k++) {
-        const idx = order[k];
-        try {
-          const proxyUrl = CORS_PROXIES[idx](url);
-          const response = await fetch(proxyUrl, { signal: getFetchTimeoutSignal(8000) });
-          if (!response.ok) continue;
-          const text = await response.text();
-          if (text && text.toLowerCase().includes("<feed")) {
-            setProxyPreference(channelId, idx);
-            return text;
-          }
-        } catch (_) {
-        }
-      }
-      return null;
-    }
-
-    async function runChannelCheckApi(channel, { triggerAlerts }) {
-      const entries = await fetchLatestUploadsByApi(channel.channelId);
-      const last24h = getLast24HourVideos(entries);
-      const alertCandidates = getAlertEligibleVideos(entries);
-      const seenSet = new Set(loadSeenVideosForChannel(channel.channelId));
-      const entryIds = entries.map((entry) => entry.videoId);
-
-      if (triggerAlerts && seenSet.size === 0) {
-        saveSeenVideosForChannel(channel.channelId, entryIds);
-        channel.lastChecked = new Date().toISOString();
-        trackedChannels[channel.channelId] = channel;
-        return { last24h, newCount: 0 };
-      }
-
-      const newVideos = triggerAlerts
-        ? alertCandidates.filter((entry) => !isSeen(channel.channelId, entry.videoId))
-        : [];
-
-      if (triggerAlerts && newVideos.length) {
-        for (const video of newVideos) {
-          markSeen(channel.channelId, video.videoId);
-          addAlertRecord({
-            channelId: channel.channelId,
-            channelTitle: channel.channelTitle,
-            nicheKeyword: normalizeNicheTag(channel.nicheKeyword),
-            channelThumbnail: channel.channelThumbnail || "",
-            videoId: video.videoId,
-            videoTitle: video.title,
-            videoUrl: video.videoUrl,
-            detectedAt: new Date().toISOString()
-          });
-        }
-      }
-
-      saveSeenVideosForChannel(channel.channelId, [...entryIds, ...seenSet]);
+    function updateChannelStatus(channelId, status) {
+      const channel = trackedChannels[channelId];
+      if (!channel) return;
       channel.lastChecked = new Date().toISOString();
-      trackedChannels[channel.channelId] = channel;
-      return { last24h, newCount: newVideos.length };
+      channel.status = status;
+      channel.consecutiveFailures = status === "failed"
+        ? Number(channel.consecutiveFailures || 0) + 1
+        : 0;
+      trackedChannels[channelId] = channel;
     }
 
-    async function runChannelCheckRss(channel) {
-      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channel.channelId)}`;
-      const xmlText = await fetchWithProxyFallback(rssUrl, channel.channelId);
-      const nowIso = new Date().toISOString();
-      if (!xmlText) {
-        channel.lastChecked = nowIso;
-        channel.rssLastChecked = nowIso;
-        channel.rssLastSuccess = false;
-        channel.rssConsecutiveFailures = Number(channel.rssConsecutiveFailures || 0) + 1;
-        trackedChannels[channel.channelId] = channel;
-        return { ok: false, newCount: 0, last24h: [] };
+    function processPlaylistResponse(channelId, channel, data, { triggerAlerts = true, bootstrapIfEmpty = false } = {}) {
+      if (!data || !Array.isArray(data.items) || !data.items.length) {
+        updateChannelStatus(channelId, "success");
+        return { newCount: 0, latestEntry: null };
       }
 
-      const entries = parseRssEntries(xmlText);
-      const last24h = getLast24HourVideos(entries);
-      const alertCandidates = getAlertEligibleVideos(entries);
-      const seenSet = new Set(loadSeenVideosForChannel(channel.channelId));
-      const entryIds = entries.map((entry) => entry.videoId);
-      const newVideos = alertCandidates.filter((entry) => !isSeen(channel.channelId, entry.videoId));
+      const latestVideo = data.items[0] || {};
+      const snippet = latestVideo.snippet || {};
+      const videoId = snippet?.resourceId?.videoId || "";
+      const videoTitle = snippet.title || "Untitled";
+      const publishedAt = snippet.publishedAt || "";
+      const videoUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : "";
 
-      if (newVideos.length) {
-        for (const video of newVideos) {
-          markSeen(channel.channelId, video.videoId);
-          addAlertRecord({
-            channelId: channel.channelId,
-            channelTitle: channel.channelTitle,
-            nicheKeyword: normalizeNicheTag(channel.nicheKeyword),
-            channelThumbnail: channel.channelThumbnail || "",
-            videoId: video.videoId,
-            videoTitle: video.title,
-            videoUrl: video.videoUrl,
-            detectedAt: new Date().toISOString()
-          });
+      updateChannelStatus(channelId, "success");
+
+      if (!videoId) {
+        return { newCount: 0, latestEntry: null };
+      }
+
+      const seen = loadSeenVideosForChannel(channelId);
+      if (bootstrapIfEmpty && seen.length === 0) {
+        markSeen(channelId, videoId);
+        return {
+          newCount: 0,
+          latestEntry: { videoId, title: videoTitle, publishedAt, videoUrl }
+        };
+      }
+
+      const alertWindowTs = Date.now() - Number(autoCheckConfig.alertWindowMs || DEFAULT_ALERT_WINDOW_MS);
+      const videoTs = new Date(publishedAt).getTime();
+      const inAlertWindow = !Number.isNaN(videoTs) && videoTs >= alertWindowTs;
+
+      if (triggerAlerts && inAlertWindow && !isSeen(channelId, videoId)) {
+        markSeen(channelId, videoId);
+        addAlertRecord({
+          channelId,
+          channelTitle: channel.channelTitle,
+          nicheKeyword: normalizeNicheTag(channel.nicheKeyword),
+          channelThumbnail: channel.channelThumbnail || "",
+          videoId,
+          videoTitle,
+          videoUrl,
+          detectedAt: new Date().toISOString()
+        });
+        return {
+          newCount: 1,
+          latestEntry: { videoId, title: videoTitle, publishedAt, videoUrl }
+        };
+      }
+
+      if (!isSeen(channelId, videoId)) {
+        markSeen(channelId, videoId);
+      }
+
+      return {
+        newCount: 0,
+        latestEntry: { videoId, title: videoTitle, publishedAt, videoUrl }
+      };
+    }
+
+    async function checkChannelForNewVideos(channelId, channel, options = {}) {
+      const { triggerAlerts = true, bootstrapIfEmpty = false } = options;
+      const uploadsPlaylistId = getUploadsPlaylistId(channelId);
+      let keyUsed = getNextAPIKey();
+      let url = `${API_BASE}/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=1&key=${encodeURIComponent(keyUsed)}`;
+
+      try {
+        let data;
+        let response = await fetch(url);
+        if (!response.ok) {
+          keyUsed = getNextAPIKey();
+          url = `${API_BASE}/playlistItems?part=snippet&playlistId=${encodeURIComponent(uploadsPlaylistId)}&maxResults=1&key=${encodeURIComponent(keyUsed)}`;
+          response = await fetch(url);
+          if (!response.ok) throw new Error(`API failed: HTTP ${response.status}`);
+        }
+        data = await response.json();
+        incrementDailyQuota(1);
+        trackQuotaUsage(getAPIKeyIndex(keyUsed), 1);
+
+        return processPlaylistResponse(channelId, channel, data, { triggerAlerts, bootstrapIfEmpty });
+      } catch (error) {
+        console.log(`Check failed for ${channel.channelTitle}: ${error.message}`);
+        updateChannelStatus(channelId, "failed");
+        return { newCount: 0, latestEntry: null, error: error.message };
+      }
+    }
+
+    async function checkAllTrackedChannels(options = {}) {
+      const { triggerAlerts = true, manual = false } = options;
+      const channels = manual ? getFilteredTrackedChannels() : Object.values(trackedChannels);
+      if (!channels.length) return { total: 0, success: 0, failed: 0, newCount: 0 };
+
+      const batchSize = 10;
+      let success = 0;
+      let failed = 0;
+      let newCount = 0;
+
+      for (let i = 0; i < channels.length; i += batchSize) {
+        const batch = channels.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map((channel) => checkChannelForNewVideos(channel.channelId, channel, {
+            triggerAlerts,
+            bootstrapIfEmpty: !manual
+          }))
+        );
+        batchResults.forEach((result) => {
+          newCount += Number(result.newCount || 0);
+          if (result.error) failed += 1;
+          else success += 1;
+        });
+        if (manual) {
+          const progress = Math.min(channels.length, i + batch.length);
+          trackerStatus.textContent = `Checking channels ${progress}/${channels.length} via PlaylistItems API...`;
         }
       }
 
-      saveSeenVideosForChannel(channel.channelId, [...entryIds, ...seenSet]);
-      channel.lastChecked = nowIso;
-      channel.rssLastChecked = nowIso;
-      channel.rssLastSuccess = true;
-      channel.rssConsecutiveFailures = 0;
-      trackedChannels[channel.channelId] = channel;
-      return { ok: true, newCount: newVideos.length, last24h };
+      saveTrackedChannels();
+      renderTrackedChannels();
+      updateTrackerStatusLine();
+      return { total: channels.length, success, failed, newCount };
     }
 
     async function checkSingleChannelNow(channelId) {
@@ -4440,12 +5704,12 @@
       trackerExpandedRows[channelId] = { open: true, loading: true, videos: [], error: "" };
       renderTrackedChannels();
       try {
-        const result = await runChannelCheckApi(channel, { triggerAlerts: false });
+        const result = await checkChannelForNewVideos(channel.channelId, channel, { triggerAlerts: false, bootstrapIfEmpty: false });
         trackerExpandedRows[channelId] = {
           open: true,
           loading: false,
-          videos: result.last24h,
-          error: ""
+          videos: result.latestEntry ? [result.latestEntry] : [],
+          error: result.error ? `API check failed: ${result.error}` : ""
         };
         saveTrackedChannels();
       } catch (error) {
@@ -4461,6 +5725,7 @@
 
     async function checkTrackedChannelsForUploads({ manual }) {
       if (!manual || isCheckingFeeds) return;
+      const manualStartedAt = Date.now();
       const channels = getFilteredTrackedChannels();
       if (!channels.length) {
         trackerStatus.textContent = "No tracked channels in this niche.";
@@ -4471,40 +5736,10 @@
       isCheckingFeeds = true;
       checkNowBtn.disabled = true;
 
-      for (let i = 0; i < channels.length; i++) {
-        const channel = channels[i];
-        trackerStatus.textContent = `Checking channel ${i + 1} of ${channels.length}...`;
-        try {
-          const result = await runChannelCheckApi(channel, { triggerAlerts: false });
-          if (result.last24h.length > 0) {
-            trackerExpandedRows[channel.channelId] = {
-              open: true,
-              loading: false,
-              videos: result.last24h,
-              error: ""
-            };
-          } else {
-            trackerExpandedRows[channel.channelId] = {
-              ...(trackerExpandedRows[channel.channelId] || {}),
-              open: false,
-              loading: false,
-              videos: []
-            };
-          }
-        } catch (error) {
-          trackerExpandedRows[channel.channelId] = {
-            open: true,
-            loading: false,
-            videos: [],
-            error: `API check failed: ${error.message}`
-          };
-        }
-        await sleep(200);
-        renderTrackedChannels();
-      }
-
-      saveTrackedChannels();
+      const summary = await checkAllTrackedChannels({ triggerAlerts: false, manual: true });
       trackerStatus.textContent = `Last manual check: ${formatDateTime(new Date().toISOString())}`;
+      trackerLastCycleStats = { success: summary.success, total: summary.total, failed: summary.failed };
+      recordTrackerCycleMetrics(summary.total, summary.failed, Date.now() - manualStartedAt);
       checkNowBtn.disabled = false;
       isCheckingFeeds = false;
     }
@@ -4517,6 +5752,7 @@
       if (!autoCheckConfig.enabled) {
         trackerStatus.textContent = "Auto-tracking: OFF";
         if (trackerCycleStats) trackerCycleStats.textContent = "Last cycle: -";
+        renderTrackerPerfBadge();
         return;
       }
       const channelsCount = Object.keys(trackedChannels).length;
@@ -4529,10 +5765,43 @@
         const ss = String(left % 60).padStart(2, "0");
         countdown = `${mm}:${ss}`;
       }
-      trackerStatus.textContent = `Auto-tracking: ${isUltra ? "ULTRA" : "ON"} - Next check in ${countdown} - ${channelsCount} channels via RSS (free) - alerts for last ${alertWindowMin} min`;
+      trackerStatus.textContent = `Auto-tracking: ${isUltra ? "ULTRA" : "ON"} - Next check in ${countdown} - ${channelsCount} channels via PlaylistItems API (1 unit/check) - alerts for last ${alertWindowMin} min`;
       if (trackerCycleStats) {
         trackerCycleStats.textContent = `Last cycle: ${trackerLastCycleStats.success}/${trackerLastCycleStats.total} channels checked successfully - ${trackerLastCycleStats.failed} failed (will retry)`;
       }
+    }
+
+    function recordTrackerCycleMetrics(total, failed, elapsedMs) {
+      const checked = Number(total || 0);
+      const failedCount = Number(failed || 0);
+      const durationMs = Math.max(1, Number(elapsedMs || 1));
+      trackerCycleHistory.push({ checked, failed: failedCount, durationMs, at: Date.now() });
+      if (trackerCycleHistory.length > 10) {
+        trackerCycleHistory = trackerCycleHistory.slice(-10);
+      }
+      renderTrackerPerfBadge();
+    }
+
+    function renderTrackerPerfBadge() {
+      if (!trackerPerfBadge) return;
+      if (!trackerCycleHistory.length) {
+        trackerPerfBadge.textContent = "Performance: -";
+        return;
+      }
+      const totals = trackerCycleHistory.reduce((acc, item) => {
+        acc.checked += item.checked;
+        acc.failed += item.failed;
+        acc.durationMs += item.durationMs;
+        return acc;
+      }, { checked: 0, failed: 0, durationMs: 0 });
+
+      const checkedPerMin = totals.durationMs > 0
+        ? (totals.checked * 60000) / totals.durationMs
+        : 0;
+      const failRate = totals.checked > 0
+        ? (totals.failed / totals.checked) * 100
+        : 0;
+      trackerPerfBadge.textContent = `Performance (last ${trackerCycleHistory.length} cycles): ${checkedPerMin.toFixed(1)} checked/min | ${failRate.toFixed(1)}% fail-rate`;
     }
 
     function startCountdownTicker() {
@@ -4546,7 +5815,6 @@
     async function runAutoTrackingCycle() {
       if (!autoCheckConfig.enabled || isCheckingFeeds) return;
       const startedAt = Date.now();
-      const isUltra = autoCheckConfig.intervalMs === ULTRA_CHECK_INTERVAL_MS;
       const channels = Object.values(trackedChannels);
       if (!channels.length) {
         autoCheckNextRunAt = Date.now() + autoCheckConfig.intervalMs;
@@ -4556,45 +5824,12 @@
       }
 
       isCheckingFeeds = true;
-      await ensureNotificationPermission();
-      let totalNew = 0;
-      let successCount = 0;
-      let failedCount = 0;
-      let checkedCount = 0;
-      for (let i = 0; i < channels.length; i++) {
-        if (!autoCheckConfig.enabled) break;
-        const channel = channels[i];
-        if (isUltra) {
-          const retryAt = Number(channelRetryAfter[channel.channelId] || 0);
-          if (retryAt > Date.now()) {
-            continue;
-          }
-        }
-        checkedCount += 1;
-        updateTrackerStatusLine(`Auto-tracking: ON - Checking ${channel.channelTitle}... (${i + 1}/${channels.length}) - via RSS (free)`);
-        try {
-          const result = await runChannelCheckRss(channel);
-          totalNew += result.newCount;
-          if (result.ok) {
-            successCount += 1;
-            if (isUltra) delete channelRetryAfter[channel.channelId];
-          } else {
-            failedCount += 1;
-            if (isUltra) channelRetryAfter[channel.channelId] = Date.now() + ULTRA_RETRY_COOLDOWN_MS;
-          }
-        } catch (_error) {
-          failedCount += 1;
-          if (isUltra) channelRetryAfter[channel.channelId] = Date.now() + ULTRA_RETRY_COOLDOWN_MS;
-        }
-        await sleep(isUltra ? 100 : 300);
-      }
+      const summary = await checkAllTrackedChannels({ triggerAlerts: true, manual: false });
       isCheckingFeeds = false;
-      saveTrackedChannels();
-      renderTrackedChannels();
-
-      trackerLastCycleStats = { success: successCount, total: checkedCount, failed: failedCount };
+      trackerLastCycleStats = { success: summary.success, total: summary.total, failed: summary.failed };
+      recordTrackerCycleMetrics(summary.total, summary.failed, Date.now() - startedAt);
       if (trackerCycleStats) {
-        trackerCycleStats.textContent = `Last cycle: ${successCount}/${checkedCount} channels checked successfully - ${failedCount} failed (will retry)`;
+        trackerCycleStats.textContent = `Last cycle: ${summary.success}/${summary.total} channels checked successfully - ${summary.failed} failed`;
       }
 
       const elapsed = Date.now() - startedAt;
@@ -4634,7 +5869,7 @@
 
     function updateAutoCheckConfig() {
       autoCheckConfig.enabled = autoCheckToggle.checked;
-      autoCheckConfig.intervalMs = Number(autoCheckInterval.value || 180000);
+      autoCheckConfig.intervalMs = Number(autoCheckInterval.value || ULTRA_CHECK_INTERVAL_MS);
       autoCheckConfig.alertWindowMs = Number(alertWindowSelect.value || DEFAULT_ALERT_WINDOW_MS);
       if (!ALERT_WINDOW_OPTIONS.includes(autoCheckConfig.alertWindowMs)) {
         autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
@@ -4656,16 +5891,13 @@
 
     function exportTrackedChannels() {
       const seenVideos = {};
-      const proxyPreferences = {};
       Object.keys(trackedChannels).forEach((channelId) => {
         seenVideos[channelId] = loadSeenVideosForChannel(channelId);
-        proxyPreferences[channelId] = getProxyPreference(channelId);
       });
       const payload = {
         exportedAt: new Date().toISOString(),
         trackedChannels: Object.values(trackedChannels),
         seenVideos,
-        proxyPreferences,
         alertsHistory: alertHistory.slice(0, 200),
         autoTrackSettings: autoCheckConfig
       };
@@ -4703,9 +5935,8 @@
             dateAdded: item.dateAdded || new Date().toISOString(),
             lastChecked: item.lastChecked || null,
             channelThumbnail: item.channelThumbnail || "",
-            rssLastChecked: item.rssLastChecked || null,
-            rssLastSuccess: item.rssLastSuccess !== false,
-            rssConsecutiveFailures: Number(item.rssConsecutiveFailures || 0)
+            status: item.status || "idle",
+            consecutiveFailures: Number(item.consecutiveFailures || 0)
           };
           if (Array.isArray(item.seenVideoIds)) {
             saveSeenVideosForChannel(item.channelId, item.seenVideoIds);
@@ -4718,15 +5949,6 @@
           });
         }
 
-        if (parsed && parsed.proxyPreferences && typeof parsed.proxyPreferences === "object") {
-          Object.entries(parsed.proxyPreferences).forEach(([channelId, idx]) => {
-            const proxyIndex = Number(idx);
-            if (Number.isInteger(proxyIndex) && proxyIndex >= 0 && proxyIndex < CORS_PROXIES.length) {
-              setProxyPreference(channelId, proxyIndex);
-            }
-          });
-        }
-
         if (Array.isArray(parsed.alertsHistory)) {
           alertHistory = parsed.alertsHistory.slice(0, 200);
           saveAlertHistory();
@@ -4734,7 +5956,7 @@
 
         if (parsed.autoTrackSettings && typeof parsed.autoTrackSettings === "object") {
           autoCheckConfig.enabled = !!parsed.autoTrackSettings.enabled;
-          autoCheckConfig.intervalMs = Number(parsed.autoTrackSettings.intervalMs || 180000);
+          autoCheckConfig.intervalMs = Number(parsed.autoTrackSettings.intervalMs || ULTRA_CHECK_INTERVAL_MS);
           autoCheckConfig.alertWindowMs = Number(parsed.autoTrackSettings.alertWindowMs || DEFAULT_ALERT_WINDOW_MS);
           if (!ALERT_WINDOW_OPTIONS.includes(autoCheckConfig.alertWindowMs)) {
             autoCheckConfig.alertWindowMs = DEFAULT_ALERT_WINDOW_MS;
@@ -4767,14 +5989,14 @@
       resultsBody.innerHTML = "";
       emptyState.style.display = "none";
 
-      const apiKey = apiKeyInput.value.trim();
+      const manualApiKey = apiKeyInput.value.trim();
       const keyword = keywordInput.value.trim();
       const targetResults = Number(maxResultsSelect.value || 50);
       const targetPages = Math.max(1, Math.ceil(targetResults / 50));
       currentKeyword = keyword;
 
-      if (!apiKey) {
-        showError("Please enter a valid YouTube API key.");
+      if (!hasConfiguredAPIKeys()) {
+        showError("Add at least one API key in YOUTUBE_API_KEYS (or API key input).");
         return;
       }
 
@@ -4783,7 +6005,9 @@
         return;
       }
 
-      localStorage.setItem(API_KEY_STORAGE, apiKey);
+      if (manualApiKey) {
+        localStorage.setItem(API_KEY_STORAGE, manualApiKey);
+      }
       setLoading(true, `Fetching page 1 of ${targetPages}...`);
 
       try {
@@ -4802,8 +6026,7 @@
             publishedAfter,
             order: "viewCount",
             regionCode: "US",
-            maxResults: "50",
-            key: apiKey
+            maxResults: "50"
           };
           if (nextPageToken) {
             searchParams.pageToken = nextPageToken;
@@ -4861,7 +6084,6 @@
           const videosData = await fetchJson(buildUrl("videos", {
             part: "statistics",
             id: videoIdBatches[i].join(","),
-            key: apiKey,
             maxResults: "50"
           }));
           (videosData.items || []).forEach((video) => {
@@ -4876,7 +6098,6 @@
           const channelsData = await fetchJson(buildUrl("channels", {
             part: "snippet,statistics",
             id: channelIdBatches[i].join(","),
-            key: apiKey,
             maxResults: "50"
           }));
           channelItems.push(...(Array.isArray(channelsData.items) ? channelsData.items : []));
