@@ -6138,6 +6138,7 @@
     }
 
     function addAlertRecord(record) {
+      console.log("🎯 NEW VIDEO DETECTED:", record.channelTitle || "Unknown Channel", record.videoTitle || "Untitled");
       alertHistory.unshift(record);
       alertHistory = alertHistory.slice(0, 200);
 
@@ -6147,6 +6148,15 @@
       sendPushNotification(record.channelTitle, record.videoTitle);
       triggerServerPush(record);
       playAlertBeep();
+
+      // Send Slack alert (single source of truth for all real alerts)
+      sendSlackAlert(
+        record.channelTitle || record.channel || "",
+        record.videoTitle || "",
+        record.videoId || extractVideoIdFromUrl(record.videoUrl || ""),
+        record.niche || record.nicheKeyword || ""
+      );
+      console.log("📤 Slack alert triggered for:", record.channelTitle || record.channel || "Unknown Channel");
     }
 
     async function bootstrapSeenVideos(channelId) {
@@ -6358,6 +6368,7 @@
 
       if (triggerAlerts && inAlertWindow && !isSeen(channelId, videoId)) {
         markSeen(channelId, videoId);
+        console.log("🎯 NEW VIDEO DETECTED:", channel.channelTitle, videoTitle);
         addAlertRecord({
           channelId,
           channelTitle: channel.channelTitle,
@@ -6368,7 +6379,6 @@
           videoUrl,
           detectedAt: new Date().toISOString()
         });
-        sendSlackAlert(channel.channelTitle, videoTitle, videoId, normalizeNicheTag(channel.nicheKeyword));
         return {
           newCount: 1,
           latestEntry: { videoId, title: videoTitle, publishedAt, videoUrl }
