@@ -6748,7 +6748,14 @@
         initApp();
         showToast(`Welcome, ${memberProfile.name}!`);
       } catch (error) {
-        showAccessCodeError("Connection error. Check internet and try again.");
+        const msg = String(error && error.message ? error.message : "");
+        if (msg.includes("HTTP 404")) {
+          showAccessCodeError("Sheet URL is invalid (404). Admin must update GOOGLE_SHEET_URL and redeploy.");
+        } else if (msg.includes("HTTP 403") || msg.includes("HTTP 401")) {
+          showAccessCodeError("Sheet access denied. Deploy Apps Script as Web App with Anyone access.");
+        } else {
+          showAccessCodeError("Connection error. Check internet and try again.");
+        }
       } finally {
         memberJoinBtn.disabled = false;
         memberJoinBtn.textContent = "Join";
