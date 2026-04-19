@@ -5705,6 +5705,10 @@
         const swCode = `
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow("/"));
+});
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SHOW_NOTIFICATION") {
     self.registration.showNotification(event.data.title, {
@@ -5722,6 +5726,7 @@ self.addEventListener("message", (event) => {
         serviceWorkerRegistration = await navigator.serviceWorker.register(swUrl);
         window.swRegistration = serviceWorkerRegistration;
         URL.revokeObjectURL(swUrl);
+        console.log("✅ Service Worker registered");
         return serviceWorkerRegistration;
       } catch (error) {
         console.warn("Service worker registration failed:", error);
@@ -5834,13 +5839,16 @@ self.addEventListener("message", (event) => {
 
       if (Notification.permission === "granted") {
         try {
-          new Notification("🔔 Test Notification", {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification("🔔 Test Notification", {
             body: "Notifications are working!",
-            icon: "https://www.youtube.com/favicon.ico"
+            icon: "https://www.youtube.com/favicon.ico",
+            vibrate: [200, 100, 200]
           });
           showToast("✅ Notifications already active - test sent!");
         } catch (error) {
           showToast(`Error sending test notification: ${error.message}`);
+          console.error("SW showNotification failed:", error);
         }
         updateNotificationBadge();
         return;
@@ -5856,9 +5864,11 @@ self.addEventListener("message", (event) => {
         const permission = await Notification.requestPermission();
         updateNotificationBadge();
         if (permission === "granted") {
-          new Notification("🔔 Notifications Enabled!", {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification("🔔 Notifications Enabled!", {
             body: "You will now receive alerts for new videos",
-            icon: "https://www.youtube.com/favicon.ico"
+            icon: "https://www.youtube.com/favicon.ico",
+            vibrate: [200, 100, 200]
           });
           await subscribeToWebPush();
           showToast("✅ Notifications enabled!");
@@ -5867,6 +5877,7 @@ self.addEventListener("message", (event) => {
         }
       } catch (error) {
         showToast(`Error requesting permission: ${error.message}`);
+        console.error("Permission request error:", error);
       }
     }
 
@@ -5915,45 +5926,42 @@ self.addEventListener("message", (event) => {
       oscillator.stop(audioCtx.currentTime + 0.2);
     }
 
-    function sendPushNotification(channelTitle, videoTitle) {
+    async function sendPushNotification(channelTitle, videoTitle) {
       if (!("Notification" in window)) return;
       if (Notification.permission !== "granted") return;
 
       const title = "🎯 New Video Alert!";
       const body = `${channelTitle}: ${videoTitle}`;
+      const options = {
+        body,
+        icon: "https://www.youtube.com/favicon.ico",
+        badge: "https://www.youtube.com/favicon.ico",
+        tag: `yt-alert-${Date.now()}`,
+        requireInteraction: true,
+        vibrate: [200, 100, 200]
+      };
 
       try {
-        if (window.swRegistration && window.swRegistration.active) {
-          window.swRegistration.active.postMessage({
-            type: "SHOW_NOTIFICATION",
-            title,
-            body,
-            tag: `yt-alert-${Date.now()}`
-          });
-          console.log("✅ SW notification sent");
-        } else {
-          new Notification(title, {
-            body,
-            icon: "https://www.youtube.com/favicon.ico",
-            badge: "https://www.youtube.com/favicon.ico",
-            tag: `yt-alert-${Date.now()}`,
-            requireInteraction: true,
-            vibrate: [200, 100, 200]
-          });
-          console.log("✅ Regular notification sent");
-        }
+        const registration = await navigator.serviceWorker.ready;
+        await registration.showNotification(title, options);
+        console.log("✅ Notification sent via Service Worker");
       } catch (error) {
-        console.error("Notification failed:", error);
+        console.error("Service Worker notification failed:", error);
       }
     }
 
-    function testNotification() {
+    async function testNotification() {
       if (!("Notification" in window) || Notification.permission !== "granted") {
         showToast("Enable notifications first by clicking the badge in header");
         return;
       }
-      sendPushNotification("Test Channel", "This is a test notification");
-      showToast("Test notification sent!");
+      try {
+        await sendPushNotification("Test Channel", "This is a test notification");
+        showToast("✅ Test notification sent!");
+      } catch (error) {
+        showToast(`Error: ${error.message}`);
+        console.error("Test notification error:", error);
+      }
     }
 
     async function triggerServerPush(record) {
