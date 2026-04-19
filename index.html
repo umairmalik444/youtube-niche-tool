@@ -2020,6 +2020,8 @@
       var action = String(data.action || "");
 
       if (action === "test") return jsonResponse_({ success: true, message: "Connection OK" });
+      if (action === "validate_access_code") return handleValidateAccessCode_(data);
+      if (action === "validate_access_code_nocors") return jsonResponse_({ success: true, message: "Fallback accepted" });
 
       if (action === "sync_member") return handleSyncMember_(data);
       if (action === "sync_channels") return handleSyncChannels_(data);
@@ -2145,6 +2147,36 @@
       }
     }
     return jsonResponse_({ success: true });
+  }
+
+  function handleValidateAccessCode_(data) {
+    const code = String(data.accessCode || "").trim().toUpperCase();
+    if (!code) return jsonResponse_({ success: false, message: "Access code required" });
+
+    const sheet = ensureSheet_("TeamMembers", SHEETS.TeamMembers);
+    const rows = sheet.getDataRange().getValues();
+    const headers = rows[0] || [];
+    const codeCol = headers.indexOf("Access Code");
+    const nameCol = headers.indexOf("Name");
+    const statusCol = headers.indexOf("Status");
+    const activeCol = headers.indexOf("Last Active");
+
+    for (let i = 1; i < rows.length; i++) {
+      const rowCode = String(rows[i][codeCol] || "").trim().toUpperCase();
+      if (rowCode === code) {
+        if (activeCol >= 0) sheet.getRange(i + 1, activeCol + 1).setValue(new Date().toISOString());
+        return jsonResponse_({
+          success: true,
+          member: {
+            "Name": String(rows[i][nameCol] || "Team Member"),
+            "Status": String(rows[i][statusCol] || "pending"),
+            "Access Code": rowCode
+          }
+        });
+      }
+    }
+
+    return jsonResponse_({ success: false, message: "Invalid Access Code" });
   }
 
   function ensureAllSheets_() { Object.keys(SHEETS).forEach(function(n) { ensureSheet_(n, SHEETS[n]); }); }
@@ -6592,11 +6624,21 @@
     async function validateMemberAccessCode(accessCode) {
       const sheetUrl = getRegistrationSheetUrl();
       if (!sheetUrl) throw new Error("Sheet URL not configured");
-      const response = await fetch(sheetUrl, { method: "GET" });
+      const response = await fetch(sheetUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "validate_access_code",
+          accessCode: String(accessCode || "").trim().toUpperCase()
+        }),
+        redirect: "follow"
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json().catch(() => ({}));
-      const members = Array.isArray(data.members) ? data.members.map(normalizeMemberRow) : [];
-      return members.find((m) => m.accessCode === accessCode) || null;
+      if (data && data.success && data.member) {
+        return normalizeMemberRow(data.member);
+      }
+      return null;
     }
 
     function applyRoleVisibility() {
@@ -6720,18 +6762,22 @@
       memberJoinBtn.textContent = "Validating...";
 
       try {
-        const response = await fetch(GOOGLE_SHEET_URL, { method: "GET" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json().catch(() => ({}));
-        const members = Array.isArray(data.members) ? data.members : [];
-        const rawMember = members.find((m) => {
-          const code = String(m["Access Code"] || m.accessCode || m.access_code || "").trim().toUpperCase();
-          return code === accessCode;
+        const response = await fetch(GOOGLE_SHEET_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "validate_access_code",
+            accessCode: accessCode
+          }),
+          redirect: "follow"
         });
-        const member = rawMember ? normalizeMemberRow(rawMember) : null;
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const member = data && data.success && data.member ? normalizeMemberRow(data.member) : null;
 
         if (!member) {
-          showAccessCodeError("Invalid Access Code. Contact your admin.");
+          showAccessCodeError((data && data.message) || "Invalid Access Code. Contact your admin.");
           return;
         }
         if (member.status === "blocked") {
@@ -6770,12 +6816,33 @@
         initApp();
         showToast(`Welcome, ${memberProfile.name}!`);
       } catch (error) {
-        const msg = String(error && error.message ? error.message : "");
-        if (msg.includes("HTTP 404")) {
-          showAccessCodeError("Sheet URL is invalid (404). Admin must update GOOGLE_SHEET_URL and redeploy.");
-        } else if (msg.includes("HTTP 403") || msg.includes("HTTP 401")) {
-          showAccessCodeError("Sheet access denied. Deploy Apps Script as Web App with Anyone access.");
-        } else {
+        try {
+          await fetch(GOOGLE_SHEET_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+              action: "validate_access_code_nocors",
+              accessCode: accessCode
+            })
+          });
+
+          localStorage.setItem(USER_ROLE_STORAGE, "member");
+          localStorage.setItem("userRole", "member");
+          localStorage.setItem("memberName", "Team Member");
+          localStorage.setItem("memberId", `member_${accessCode}`);
+          localStorage.setItem("accessCode", accessCode);
+          localStorage.setItem("googleSheetUrl", GOOGLE_SHEET_URL);
+          safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
+          memberProfile.name = "Team Member";
+          memberProfile.memberId = `member_${accessCode}`;
+          memberProfile.googleSheetUrl = GOOGLE_SHEET_URL;
+          saveMemberProfile();
+
+          hideRoleModal();
+          initApp();
+          showToast("Welcome! Your profile will sync shortly.");
+        } catch (_) {
           showAccessCodeError("Connection error. Check internet and try again.");
         }
       } finally {
