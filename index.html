@@ -1816,6 +1816,7 @@
             <button id="testGoogleSheetBtn" class="btn btn-secondary" type="button">Test Connection</button>
             <button id="syncNowBtn" class="btn" type="button">Sync Now</button>
             <button class="btn btn-secondary" type="button" onclick="testNotification()">🔔 Test Notification</button>
+            <button class="btn btn-secondary" type="button" onclick="testSlackAlert()">🔔 Test Slack Alert</button>
           </div>
           <div>
             <label class="inline-toggle" for="autoSyncToggle">
@@ -1910,6 +1911,7 @@
                   <th>Name</th>
                   <th>Access Code</th>
                   <th>Status</th>
+                  <th>Slack</th>
                   <th>Last Active</th>
                   <th>Action</th>
                 </tr>
@@ -1927,9 +1929,28 @@
               <label>Generated Access Code</label>
               <div id="generatedAccessCodeDisplay" class="code-display">-</div>
             </div>
+            <div>
+              <label for="newMemberWebhookInput">Slack Webhook URL</label>
+              <input id="newMemberWebhookInput" type="text" placeholder="https://hooks.slack.com/services/..." autocomplete="off" />
+            </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button id="generateAccessCodeBtn" class="btn btn-secondary" type="button">Generate Access Code</button>
               <button id="addTeamMemberBtn" class="btn" type="button">Add Member</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tracker-card" style="margin-top: 12px;">
+          <h3>Admin Slack Channel</h3>
+          <div style="padding:12px;display:grid;gap:10px;">
+            <p class="small-muted">You receive copies of ALL team alerts in your admin channel.</p>
+            <div>
+              <label for="adminWebhookInput">Admin Slack Webhook URL</label>
+              <input id="adminWebhookInput" type="text" placeholder="https://hooks.slack.com/services/..." autocomplete="off" />
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn" type="button" onclick="saveAdminWebhook()">Save</button>
+              <button class="btn btn-secondary" type="button" onclick="testSlackAlert()">🔔 Test</button>
             </div>
           </div>
         </section>
@@ -1954,6 +1975,16 @@
           <div id="memberOwnKeySavedWrap" style="padding: 0 12px 12px 12px; display:none;">
             <div class="small-muted" id="memberOwnKeySavedDisplay"></div>
             <button id="removeMemberOwnKeyBtn" class="btn btn-secondary" style="margin-top:8px;" type="button">Remove My Key</button>
+          </div>
+        </section>
+
+        <section class="tracker-card" style="margin-top: 12px;">
+          <h3>Slack Notifications</h3>
+          <div style="padding:12px;display:grid;gap:10px;">
+            <div class="small-muted" id="memberSlackStatusText">Slack notifications: ❌ Not configured - contact admin</div>
+            <div>
+              <button class="btn btn-secondary" type="button" onclick="testSlackAlert()">🔔 Test Slack Alert</button>
+            </div>
           </div>
         </section>
       </div>
@@ -2295,6 +2326,8 @@
     const MEMBER_OWN_KEY_STORAGE = "yt_member_own_key";
     const MEMBER_ACCESS_CODE_STORAGE = "yt_member_access_code";
     const TEAM_MEMBERS_MANAGED_STORAGE = "yt_team_members_managed";
+    const MEMBER_SLACK_WEBHOOK_STORAGE = "slackWebhookUrl";
+    const ADMIN_SLACK_WEBHOOK_STORAGE = "adminSlackWebhookUrl";
     const DEFAULT_ALERT_WINDOW_MS = 300000;
     const ALERT_WINDOW_OPTIONS = [60000, 120000, 180000, 240000, 300000];
     const ULTRA_CHECK_INTERVAL_MS = 30000;
@@ -2435,8 +2468,11 @@
     const teamMembersManagementBody = document.getElementById("teamMembersManagementBody");
     const newMemberNameInput = document.getElementById("newMemberNameInput");
     const generatedAccessCodeDisplay = document.getElementById("generatedAccessCodeDisplay");
+    const newMemberWebhookInput = document.getElementById("newMemberWebhookInput");
     const generateAccessCodeBtn = document.getElementById("generateAccessCodeBtn");
     const addTeamMemberBtn = document.getElementById("addTeamMemberBtn");
+    const adminWebhookInput = document.getElementById("adminWebhookInput");
+    const memberSlackStatusText = document.getElementById("memberSlackStatusText");
     const roleModal = document.getElementById("roleModal");
     const adminPinInput = document.getElementById("adminPinInput");
     const loginAsAdminBtn = document.getElementById("loginAsAdminBtn");
@@ -5948,6 +5984,118 @@
       }
     }
 
+    async function sendSlackAlert(channelTitle, videoTitle, videoId, niche) {
+      const memberWebhook = String(localStorage.getItem(MEMBER_SLACK_WEBHOOK_STORAGE) || "").trim();
+      const adminWebhook = String(localStorage.getItem(ADMIN_SLACK_WEBHOOK_STORAGE) || "").trim();
+      const memberName = String(localStorage.getItem("memberName") || memberProfile.name || "Unknown");
+
+      if (!memberWebhook && !adminWebhook) return;
+
+      const message = {
+        blocks: [
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: "🎯 New Video Alert!",
+              emoji: true
+            }
+          },
+          {
+            type: "section",
+            fields: [
+              {
+                type: "mrkdwn",
+                text: "*Channel:*\n" + String(channelTitle || "Unknown Channel")
+              },
+              {
+                type: "mrkdwn",
+                text: "*Niche:*\n" + String(niche || "Uncategorized")
+              }
+            ]
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "*Video:* " + String(videoTitle || "Untitled") + "\n<https://youtube.com/watch?v=" + String(videoId || "") + "|▶️ Watch on YouTube>"
+            }
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: "Detected by " + memberName + " at " + new Date().toLocaleString()
+              }
+            ]
+          }
+        ]
+      };
+
+      if (memberWebhook) {
+        try {
+          await fetch(memberWebhook, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(message)
+          });
+          console.log("✅ Member Slack alert sent");
+        } catch (error) {
+          console.log("Member Slack failed:", error.message);
+        }
+      }
+
+      if (adminWebhook && !isAdmin()) {
+        try {
+          await fetch(adminWebhook, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(message)
+          });
+          console.log("✅ Admin Slack copy sent");
+        } catch (error) {
+          console.log("Admin Slack failed:", error.message);
+        }
+      }
+    }
+
+    async function testSlackAlert() {
+      const memberWebhook = String(localStorage.getItem(MEMBER_SLACK_WEBHOOK_STORAGE) || "").trim();
+      const adminWebhook = String(localStorage.getItem(ADMIN_SLACK_WEBHOOK_STORAGE) || "").trim();
+      const canSend = isAdmin() ? Boolean(adminWebhook) : Boolean(memberWebhook || adminWebhook);
+      if (!canSend) {
+        showToast("Slack webhook URL not configured");
+        return;
+      }
+
+      await sendSlackAlert("Test Channel", "This is a test alert from Niche Tool", "dQw4w9WgXcQ", "test");
+      showToast("✅ Slack test alert sent! Check your Slack channel.");
+    }
+
+    function saveAdminWebhook() {
+      const url = String(adminWebhookInput?.value || "").trim();
+      localStorage.setItem(ADMIN_SLACK_WEBHOOK_STORAGE, url);
+      if (isAdmin()) {
+        localStorage.setItem(MEMBER_SLACK_WEBHOOK_STORAGE, url);
+      }
+      renderSlackConfigStatus();
+      showToast("✅ Admin webhook saved");
+    }
+
+    function renderSlackConfigStatus() {
+      if (adminWebhookInput && isAdmin()) {
+        adminWebhookInput.value = String(localStorage.getItem(ADMIN_SLACK_WEBHOOK_STORAGE) || "").trim();
+      }
+      if (!memberSlackStatusText || isAdmin()) return;
+      const memberWebhook = String(localStorage.getItem(MEMBER_SLACK_WEBHOOK_STORAGE) || "").trim();
+      memberSlackStatusText.textContent = memberWebhook
+        ? "Slack notifications: ✅ Configured by admin"
+        : "Slack notifications: ❌ Not configured - contact admin";
+    }
+
     async function triggerServerPush(record) {
       if (!webPushSubscriptionActive) return;
       try {
@@ -6219,6 +6367,7 @@
           videoUrl,
           detectedAt: new Date().toISOString()
         });
+        sendSlackAlert(channel.channelTitle, videoTitle, videoId, normalizeNicheTag(channel.nicheKeyword));
         return {
           newCount: 1,
           latestEntry: { videoId, title: videoTitle, publishedAt, videoUrl }
@@ -6786,7 +6935,10 @@
       const lastActive = String(
         source["Last Active"] || source.lastActive || keyMap.lastactive || ""
       ).trim();
-      return { name, accessCode, status, lastActive, memberId: `member_${accessCode}` };
+      const slackWebhookUrl = String(
+        source["Slack Webhook URL"] || source.slackWebhookUrl || keyMap.slackwebhookurl || ""
+      ).trim();
+      return { name, accessCode, status, lastActive, slackWebhookUrl, memberId: `member_${accessCode}` };
     }
 
     async function validateMemberAccessCode(accessCode) {
@@ -6814,6 +6966,7 @@
       if (currentRoleDisplay) currentRoleDisplay.textContent = admin ? "Admin 🔑" : "Team Member 👤";
       if (memberNameInput) memberNameInput.readOnly = !admin;
       if (memberIdInput) memberIdInput.readOnly = true;
+      renderSlackConfigStatus();
     }
 
     function showRoleModal() {
@@ -6844,6 +6997,8 @@
           memberProfile.name = member.name || "Member";
           memberProfile.memberId = member.memberId;
           memberProfile.googleSheetUrl = getRegistrationSheetUrl();
+          localStorage.setItem("memberName", memberProfile.name || "Member");
+          localStorage.setItem(MEMBER_SLACK_WEBHOOK_STORAGE, String(member.slackWebhookUrl || ""));
           saveMemberProfile();
           hideRoleModal();
           initApp();
@@ -6956,6 +7111,7 @@
         }
 
         const memberName = String(member["Name"] || member.name || "Team Member");
+        const memberWebhook = String(member["Slack Webhook URL"] || member.slackWebhookUrl || "").trim();
 
         localStorage.setItem(USER_ROLE_STORAGE, "member");
         localStorage.setItem("userRole", "member");
@@ -6963,6 +7119,7 @@
         localStorage.setItem("memberId", `member_${accessCode}`);
         localStorage.setItem("accessCode", accessCode);
         localStorage.setItem("googleSheetUrl", sheetUrl);
+        localStorage.setItem(MEMBER_SLACK_WEBHOOK_STORAGE, memberWebhook);
         safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
         memberProfile.name = memberName;
         memberProfile.memberId = `member_${accessCode}`;
@@ -7040,7 +7197,7 @@
       teamMembersManagementBody.innerHTML = "";
       if (!managedTeamMembers.length) {
         const tr = document.createElement("tr");
-        tr.innerHTML = '<td colspan="6" class="small-muted">No members added yet.</td>';
+        tr.innerHTML = '<td colspan="7" class="small-muted">No members added yet.</td>';
         teamMembersManagementBody.appendChild(tr);
         return;
       }
@@ -7049,13 +7206,16 @@
         const tr = document.createElement("tr");
         const status = String(member.status || "pending").toLowerCase();
         const statusIcon = status === "active" ? "✅ Active" : status === "blocked" ? "⛔ Blocked" : "🟡 Pending";
+        const slackSet = String(member.slackWebhookUrl || "").trim().length > 0;
         tr.innerHTML = `
           <td>${idx + 1}</td>
           <td>${escapeHtml(member.name || "-")}</td>
           <td><span class="code-display" style="display:inline-block;padding:4px 8px;">${escapeHtml(member.accessCode || "-")}</span></td>
           <td>${statusIcon}</td>
+          <td>${slackSet ? "✅ Set" : "❌ Not Set"}</td>
           <td>${escapeHtml(member.lastActive ? formatRelativeTime(member.lastActive) : "Never")}</td>
           <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-secondary" type="button" data-edit-member-webhook="${escapeHtml(member.accessCode)}">Edit</button>
             <button class="btn btn-secondary" type="button" data-toggle-member-block="${escapeHtml(member.accessCode)}">${status === "blocked" ? "Unblock" : "Block"}</button>
             <button class="btn btn-secondary" type="button" data-remove-member="${escapeHtml(member.accessCode)}">Remove</button>
           </td>
@@ -7080,7 +7240,8 @@
           status: r.status || "pending",
           lastActive: r.lastActive || "",
           createdAt: r.createdAt || "",
-          createdBy: r.createdBy || "admin"
+          createdBy: r.createdBy || "admin",
+          slackWebhookUrl: r.slackWebhookUrl || ""
         }));
         saveManagedTeamMembers();
         renderTeamMembersManagement();
@@ -7098,6 +7259,7 @@
       const name = String(newMemberNameInput.value || "").trim();
       const displayCode = String(generatedAccessCodeDisplay?.textContent || "").trim().toUpperCase();
       const accessCode = String(pendingGeneratedAccessCode || displayCode || "").trim().toUpperCase();
+      const slackWebhookUrl = String(newMemberWebhookInput?.value || "").trim();
       if (!name) {
         showToast("Enter member name.");
         return;
@@ -7118,7 +7280,8 @@
         status: "pending",
         createdAt: new Date().toISOString(),
         createdBy: localStorage.getItem("memberName") || "Admin",
-        lastActive: ""
+        lastActive: "",
+        slackWebhookUrl
       };
 
       await postSheetAction(endpoint, { action: "add_member", member: row });
@@ -7128,6 +7291,7 @@
       renderTeamMembersManagement();
 
       newMemberNameInput.value = "";
+      if (newMemberWebhookInput) newMemberWebhookInput.value = "";
       pendingGeneratedAccessCode = "";
       if (generatedAccessCodeDisplay) generatedAccessCodeDisplay.textContent = "-";
       showToast(`✅ Member ${name} added with code: ${accessCode}`);
@@ -7137,6 +7301,15 @@
     }
 
     async function handleTeamMembersManagementActions(event) {
+      const editBtn = event.target.closest("button[data-edit-member-webhook]");
+      if (editBtn) {
+        const code = String(editBtn.getAttribute("data-edit-member-webhook") || "").trim().toUpperCase();
+        if (!code) return;
+        const member = managedTeamMembers.find((m) => String(m.accessCode || "").trim().toUpperCase() === code);
+        await editMemberWebhook(code, member?.slackWebhookUrl || "");
+        return;
+      }
+
       const removeBtn = event.target.closest("button[data-remove-member]");
       if (removeBtn) {
         const code = String(removeBtn.getAttribute("data-remove-member") || "").trim().toUpperCase();
@@ -7173,6 +7346,29 @@
         saveManagedTeamMembers();
         renderTeamMembersManagement();
         showToast(nextStatus === "blocked" ? "Member blocked." : "Member unblocked.");
+      }
+    }
+
+    async function editMemberWebhook(accessCode, currentUrl) {
+      const code = String(accessCode || "").trim().toUpperCase();
+      if (!code) return;
+      const nextUrl = prompt("Enter Slack Webhook URL for this member:", String(currentUrl || ""));
+      if (nextUrl === null) return;
+
+      try {
+        await postSheetAction(getRegistrationSheetUrl(), {
+          action: "update_member_webhook",
+          accessCode: code,
+          webhookUrl: String(nextUrl || "").trim()
+        });
+
+        const member = managedTeamMembers.find((m) => String(m.accessCode || "").trim().toUpperCase() === code);
+        if (member) member.slackWebhookUrl = String(nextUrl || "").trim();
+        saveManagedTeamMembers();
+        renderTeamMembersManagement();
+        showToast("✅ Webhook updated");
+      } catch (_) {
+        showToast("❌ Failed to update webhook");
       }
     }
 
