@@ -7013,12 +7013,27 @@
       if (tabTeam) tabTeam.style.display = admin ? "" : "none";
       if (adminOnlySettings) adminOnlySettings.style.display = admin ? "" : "none";
       if (memberOnlySettings) memberOnlySettings.style.display = admin ? "none" : "";
-      if (googleSheetsConnectionSection) googleSheetsConnectionSection.style.display = admin ? "" : "none";
+      if (googleSheetsConnectionSection) googleSheetsConnectionSection.style.display = "";
       if (syncActivitySection) syncActivitySection.style.display = admin ? "" : "none";
       if (saveProfileWrap) saveProfileWrap.style.display = admin ? "" : "none";
       if (currentRoleDisplay) currentRoleDisplay.textContent = admin ? "Admin 🔑" : "Team Member 👤";
       if (memberNameInput) memberNameInput.readOnly = !admin;
       if (memberIdInput) memberIdInput.readOnly = true;
+
+      // Members can trigger manual sync, but only admins manage endpoint testing/settings.
+      if (googleSheetUrlInput) {
+        const urlWrap = googleSheetUrlInput.closest("div");
+        if (urlWrap) urlWrap.style.display = admin ? "" : "none";
+        googleSheetUrlInput.disabled = !admin;
+      }
+      if (testGoogleSheetBtn) testGoogleSheetBtn.style.display = admin ? "" : "none";
+      if (syncNowBtn) syncNowBtn.style.display = "";
+      if (autoSyncToggle) {
+        const autoSyncWrap = autoSyncToggle.closest("div");
+        if (autoSyncWrap) autoSyncWrap.style.display = admin ? "" : "none";
+        autoSyncToggle.disabled = !admin;
+      }
+
       renderSlackConfigStatus();
     }
 
