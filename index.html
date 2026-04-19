@@ -2019,6 +2019,8 @@
       var data = JSON.parse(e.postData.contents);
       var action = String(data.action || "");
 
+      if (action === "test") return jsonResponse_({ success: true, message: "Connection OK" });
+
       if (action === "sync_member") return handleSyncMember_(data);
       if (action === "sync_channels") return handleSyncChannels_(data);
       if (action === "sync_alerts") return handleSyncAlerts_(data);
@@ -2191,7 +2193,7 @@
     // This URL is used by all team members to validate access codes
     // Get this from: Google Sheet > Extensions > Apps Script > Deploy > Web App URL
     // ============================================
-    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzYiUECjZY0vEmP_3dO-SX_TBob8O6P9O2IccbCrkIGmN2fTPu2FTfYn7JTKZzvQeM1Gw/exec";
+    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzYiUECjZY0vEmP_3dO-SX_TBob806P9O2lccbCrkIGmN2fTPu2FTfYn7JTKZzvQeM1Gw/exec";
     const YOUTUBE_API_KEYS = [
       // Team members add their YouTube API keys here
       // "AIzaSy...", // Aqeel
@@ -5131,23 +5133,43 @@
     }
 
     async function testGoogleSheetConnection() {
-      const endpoint = getGoogleSheetEndpoint();
+      const endpoint = String(GOOGLE_SHEET_URL || localStorage.getItem("googleSheetUrl") || getGoogleSheetEndpoint() || "").trim();
       if (!endpoint) {
         updateGoogleSheetConnectionStatus(false);
-        addSyncActivityEntry("test_connection", "error", "Missing Google Apps Script URL.");
-        showToast("Add your Google Apps Script URL first.");
+        addSyncActivityEntry("test_connection", "error", "No Sheet URL configured");
         return;
       }
+
       try {
-        const response = await fetch(endpoint, { method: "GET" });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const response = await fetch(endpoint, {
+          method: "GET",
+          redirect: "follow"
+        });
+
+        if (!response.ok) {
+          throw new Error("Response not OK");
+        }
+
         updateGoogleSheetConnectionStatus(true);
         addSyncActivityEntry("test_connection", "success", "Connection test succeeded.");
-        showToast("Google Sheets connection is working.");
+        showToast("✅ Connected");
       } catch (error) {
-        updateGoogleSheetConnectionStatus(false);
-        addSyncActivityEntry("test_connection", "error", error.message || "Connection test failed.");
-        showToast(`Connection failed: ${error.message}`);
+        try {
+          await fetch(endpoint, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ action: "test" })
+          });
+
+          updateGoogleSheetConnectionStatus(true);
+          addSyncActivityEntry("test_connection", "success", "Connection verified via POST.");
+          showToast("✅ Connected");
+        } catch (postError) {
+          updateGoogleSheetConnectionStatus(false);
+          addSyncActivityEntry("test_connection", "error", postError.message || "Connection failed");
+          showToast("❌ Connection failed");
+        }
       }
     }
 
@@ -6883,9 +6905,15 @@
       };
 
       await postSheetAction(endpoint, { action: "add_member", member: row });
-      managedTeamMembers.unshift(row);
-      saveManagedTeamMembers();
-      renderTeamMembersManagement();
+
+      // no-cors POST is opaque, so verify write by reloading members from sheet
+      await refreshManagedMembersFromSheet();
+      const existsInSheet = managedTeamMembers.some((m) => String(m.accessCode || "").toUpperCase() === accessCode);
+      if (!existsInSheet) {
+        showToast("Member was not saved to Google Sheet. Update Apps Script with add_member action.");
+        return;
+      }
+
       newMemberNameInput.value = "";
       pendingGeneratedAccessCode = "";
       if (generatedAccessCodeDisplay) generatedAccessCodeDisplay.textContent = "-";
