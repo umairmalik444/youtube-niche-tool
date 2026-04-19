@@ -6714,20 +6714,13 @@
       const sheetUrl = getRegistrationSheetUrl();
       if (!sheetUrl) throw new Error("Sheet URL not configured");
 
-      const result = await postToSheet({ action: "validate_access_code", accessCode }, sheetUrl);
-      if (result && result.success && result.member) {
-        return normalizeMemberRow(result.member);
-      }
-
-      const membersResult = await postToSheet({ action: "get_members" }, sheetUrl);
-      const members = Array.isArray(membersResult?.members) ? membersResult.members.map(normalizeMemberRow) : [];
+      const response = await fetch(sheetUrl, { method: "GET", redirect: "follow" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json().catch(() => ({}));
+      const members = Array.isArray(data?.members) ? data.members.map(normalizeMemberRow) : [];
       const code = String(accessCode || "").trim().toUpperCase();
       const matched = members.find((m) => m.accessCode === code) || null;
       if (matched) return matched;
-
-      if (result && result.success === false && result.message) {
-        throw new Error(String(result.message));
-      }
       return null;
     }
 
@@ -6837,61 +6830,90 @@
 
     async function loginAsMember() {
       hideAccessCodeError();
-      const accessCode = String(accessCodeInput.value || "").trim().toUpperCase();
+      const accessCode = String(accessCodeInput?.value || "").trim().toUpperCase();
       if (!accessCode || accessCode.length < 4) {
         showAccessCodeError("Please enter your access code");
         return;
       }
 
-      if (!GOOGLE_SHEET_URL) {
-        showAccessCodeError("Tool not configured yet. Contact admin.");
+      const sheetUrl = String(GOOGLE_SHEET_URL || "").trim();
+      if (!sheetUrl) {
+        showAccessCodeError("Tool not configured. Contact admin.");
         return;
       }
 
-      memberJoinBtn.disabled = true;
-      memberJoinBtn.textContent = "Validating...";
+      const joinBtn = memberJoinBtn || document.getElementById("memberJoinBtn") || document.querySelector("#memberLoginCard button");
+      if (joinBtn) {
+        joinBtn.disabled = true;
+        joinBtn.textContent = "Validating...";
+      }
 
       try {
-        const member = await validateMemberAccessCode(accessCode);
+        const response = await fetch(sheetUrl, { method: "GET", redirect: "follow" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json().catch(() => ({}));
+
+        if (!Array.isArray(data?.members) || !data.members.length) {
+          showAccessCodeError("No members found. Contact admin.");
+          return;
+        }
+
+        const member = data.members.find((m) => {
+          const code = String(
+            m["Access Code"] || m.accessCode || m["accessCode"] || m["access_code"] || m.code || ""
+          ).trim().toUpperCase();
+          return code === accessCode;
+        }) || null;
 
         if (!member) {
           showAccessCodeError("Invalid Access Code. Contact your admin.");
           return;
         }
-        const memberName = member.name || "Team Member";
-        const memberStatus = String(member.status || "active").toLowerCase();
+
+        const memberStatus = String(member["Status"] || member.status || "active").toLowerCase();
         if (memberStatus === "blocked") {
           showAccessCodeError("Your access has been blocked. Contact your admin.");
           return;
         }
+
+        const memberName = String(member["Name"] || member.name || "Team Member");
 
         localStorage.setItem(USER_ROLE_STORAGE, "member");
         localStorage.setItem("userRole", "member");
         localStorage.setItem("memberName", memberName);
         localStorage.setItem("memberId", `member_${accessCode}`);
         localStorage.setItem("accessCode", accessCode);
-        localStorage.setItem("googleSheetUrl", GOOGLE_SHEET_URL);
+        localStorage.setItem("googleSheetUrl", sheetUrl);
         safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
         memberProfile.name = memberName;
         memberProfile.memberId = `member_${accessCode}`;
-        memberProfile.googleSheetUrl = GOOGLE_SHEET_URL;
+        memberProfile.googleSheetUrl = sheetUrl;
         saveMemberProfile();
 
-        await postToSheet({
-          action: "update_member_status",
-          accessCode,
-          lastActive: new Date().toISOString(),
-          status: "active"
-        }, GOOGLE_SHEET_URL);
+        // Non-critical heartbeat update; do not block login if this fails.
+        fetch(sheetUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "update_member_status",
+            accessCode,
+            lastActive: new Date().toISOString(),
+            status: "active"
+          })
+        }).catch(() => {});
 
         hideRoleModal();
         initApp();
-        showToast(`Welcome, ${memberProfile.name}!`);
+        showToast(`Welcome, ${memberName}!`);
       } catch (error) {
-        showAccessCodeError(error?.message || "Connection error. Check internet and try again.");
+        console.error("Login error:", error);
+        showAccessCodeError("Connection error. Check internet and try again.");
       } finally {
-        memberJoinBtn.disabled = false;
-        memberJoinBtn.textContent = "Join";
+        if (joinBtn) {
+          joinBtn.disabled = false;
+          joinBtn.textContent = "Join";
+        }
       }
     }
 
