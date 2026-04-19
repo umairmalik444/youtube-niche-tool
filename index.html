@@ -1798,14 +1798,14 @@
             <input id="memberIdInput" type="text" readonly />
             <div class="small-muted">Your ID: <strong id="memberIdText">-</strong></div>
           </div>
-          <div style="align-self:end;">
+          <div id="saveProfileWrap" style="align-self:end;">
             <button id="saveMemberProfileBtn" class="btn btn-secondary" type="button">Save Profile</button>
           </div>
         </div>
       </section>
 
       <!-- SHARED: Google Sheets Connection -->
-      <section class="tracker-card" style="margin-top: 12px;">
+      <section id="googleSheetsConnectionSection" class="tracker-card" style="margin-top: 12px;">
         <h3>Google Sheets Connection</h3>
         <div style="padding:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
           <div style="grid-column:1 / -1;">
@@ -1826,7 +1826,7 @@
       </section>
 
       <!-- SHARED: Sync Activity Log -->
-      <section class="tracker-card" style="margin-top: 12px;">
+      <section id="syncActivitySection" class="tracker-card" style="margin-top: 12px;">
         <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
           <span>Sync Activity Log (<span id="syncActivityCount">0</span>)</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1983,7 +1983,7 @@
         <div class="role-card" id="memberLoginCard">
           <h3>👤 Team Member</h3>
           <input type="text" id="accessCodeInput" placeholder="Enter your Access Code" maxlength="6" autocomplete="off" />
-          <button id="loginAsMemberBtn" class="btn role-btn role-btn-member" type="button">Join</button>
+          <button id="memberJoinBtn" class="btn role-btn role-btn-member" type="button">Join</button>
           <p class="error-text" id="accessCodeError" style="display:none;">Invalid Access Code. Contact your admin.</p>
         </div>
       </div>
@@ -2186,8 +2186,12 @@
 
   <script>
     const API_BASE = "https://www.googleapis.com/youtube/v3";
-    // ADMIN: Paste your Google Apps Script Web App URL below before deploying
-    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/YOUR_URL_HERE/exec";
+    // ============================================
+    // ADMIN: SET YOUR GOOGLE SHEET URL HERE
+    // This URL is used by all team members to validate access codes
+    // Get this from: Google Sheet > Extensions > Apps Script > Deploy > Web App URL
+    // ============================================
+    const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzYiUECjZY0vEmP_3dO-SX_TBob8O6P9O2IccbCrkIGmN2fTPu2FTfYn7JTKZzvQeM1Gw/exec";
     const YOUTUBE_API_KEYS = [
       // Team members add their YouTube API keys here
       // "AIzaSy...", // Aqeel
@@ -2328,6 +2332,7 @@
     const memberIdInput = document.getElementById("memberIdInput");
     const memberIdText = document.getElementById("memberIdText");
     const saveMemberProfileBtn = document.getElementById("saveMemberProfileBtn");
+    const saveProfileWrap = document.getElementById("saveProfileWrap");
     const googleSheetUrlInput = document.getElementById("googleSheetUrlInput");
     const testGoogleSheetBtn = document.getElementById("testGoogleSheetBtn");
     const syncNowBtn = document.getElementById("syncNowBtn");
@@ -2364,8 +2369,10 @@
     const adminPinInput = document.getElementById("adminPinInput");
     const loginAsAdminBtn = document.getElementById("loginAsAdminBtn");
     const accessCodeInput = document.getElementById("accessCodeInput");
-    const loginAsMemberBtn = document.getElementById("loginAsMemberBtn");
+    const memberJoinBtn = document.getElementById("memberJoinBtn");
     const accessCodeError = document.getElementById("accessCodeError");
+    const googleSheetsConnectionSection = document.getElementById("googleSheetsConnectionSection");
+    const syncActivitySection = document.getElementById("syncActivitySection");
     const nicheCategoryCards = document.getElementById("nicheCategoryCards");
     const nicheSettings = document.getElementById("nicheSettings");
     const nicheSettingsToggle = document.getElementById("nicheSettingsToggle");
@@ -2464,7 +2471,7 @@
 
     // Role modal actions available before initApp
     loginAsAdminBtn.addEventListener("click", loginAsAdmin);
-    loginAsMemberBtn.addEventListener("click", loginAsMember);
+    memberJoinBtn.addEventListener("click", loginAsMember);
 
     function initApp() {
     applyRoleVisibility();
@@ -6534,9 +6541,7 @@
     }
 
     function getConfiguredSheetUrl() {
-      const hardcoded = String(GOOGLE_SHEET_URL || "").trim();
-      if (hardcoded && !hardcoded.includes("YOUR_URL_HERE")) return hardcoded;
-      return "";
+      return String(GOOGLE_SHEET_URL || "").trim();
     }
 
     function getRegistrationSheetUrl() {
@@ -6577,8 +6582,12 @@
       if (tabTeam) tabTeam.style.display = admin ? "" : "none";
       if (adminOnlySettings) adminOnlySettings.style.display = admin ? "" : "none";
       if (memberOnlySettings) memberOnlySettings.style.display = admin ? "none" : "";
+      if (googleSheetsConnectionSection) googleSheetsConnectionSection.style.display = admin ? "" : "none";
+      if (syncActivitySection) syncActivitySection.style.display = admin ? "" : "none";
+      if (saveProfileWrap) saveProfileWrap.style.display = admin ? "" : "none";
       if (currentRoleDisplay) currentRoleDisplay.textContent = admin ? "Admin 🔑" : "Team Member 👤";
       if (memberNameInput) memberNameInput.readOnly = !admin;
+      if (memberIdInput) memberIdInput.readOnly = true;
     }
 
     function showRoleModal() {
@@ -6654,10 +6663,7 @@
         return;
       }
 
-      let setupUrl = String(getConfiguredSheetUrl() || "").trim();
-      if (!setupUrl) {
-        setupUrl = String(prompt("First-time admin setup: paste your Google Apps Script Web App URL") || "").trim();
-      }
+      let setupUrl = String(getRegistrationSheetUrl() || "").trim();
       if (!setupUrl) {
         showAccessCodeError("Google Sheet URL is required for first setup.");
         return;
@@ -6678,12 +6684,30 @@
     async function loginAsMember() {
       hideAccessCodeError();
       const accessCode = String(accessCodeInput.value || "").trim().toUpperCase();
-      if (!accessCode || accessCode.length !== 6) {
-        showAccessCodeError("Please enter a 6-character access code");
+      if (!accessCode || accessCode.length < 4) {
+        showAccessCodeError("Please enter your access code");
         return;
       }
+
+      if (!GOOGLE_SHEET_URL) {
+        showAccessCodeError("Tool not configured yet. Contact admin.");
+        return;
+      }
+
+      memberJoinBtn.disabled = true;
+      memberJoinBtn.textContent = "Validating...";
+
       try {
-        const member = await validateMemberAccessCode(accessCode);
+        const response = await fetch(GOOGLE_SHEET_URL, { method: "GET" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json().catch(() => ({}));
+        const members = Array.isArray(data.members) ? data.members : [];
+        const rawMember = members.find((m) => {
+          const code = String(m["Access Code"] || m.accessCode || m.access_code || "").trim().toUpperCase();
+          return code === accessCode;
+        });
+        const member = rawMember ? normalizeMemberRow(rawMember) : null;
+
         if (!member) {
           showAccessCodeError("Invalid Access Code. Contact your admin.");
           return;
@@ -6694,24 +6718,40 @@
         }
 
         localStorage.setItem(USER_ROLE_STORAGE, "member");
+        localStorage.setItem("userRole", "member");
+        localStorage.setItem("memberName", member.name || "Team Member");
+        localStorage.setItem("memberId", `member_${accessCode}`);
+        localStorage.setItem("accessCode", accessCode);
+        localStorage.setItem("googleSheetUrl", GOOGLE_SHEET_URL);
         safeSetLocalStorage(MEMBER_ACCESS_CODE_STORAGE, accessCode, "member access code");
         memberProfile.name = member.name || "Member";
-        memberProfile.memberId = member.memberId;
-        memberProfile.googleSheetUrl = getRegistrationSheetUrl();
+        memberProfile.memberId = `member_${accessCode}`;
+        memberProfile.googleSheetUrl = GOOGLE_SHEET_URL;
         saveMemberProfile();
 
-        await postSheetAction(getRegistrationSheetUrl(), {
-          action: "update_member_status",
-          accessCode,
-          lastActive: new Date().toISOString(),
-          status: "active"
-        });
+        try {
+          await fetch(GOOGLE_SHEET_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({
+              action: "update_member_status",
+              accessCode,
+              lastActive: new Date().toISOString(),
+              status: "active"
+            })
+          });
+        } catch (_) {
+        }
 
         hideRoleModal();
         initApp();
         showToast(`Welcome, ${memberProfile.name}!`);
       } catch (error) {
-        showAccessCodeError(error.message || "Connection error. Try again.");
+        showAccessCodeError("Connection error. Check internet and try again.");
+      } finally {
+        memberJoinBtn.disabled = false;
+        memberJoinBtn.textContent = "Join";
       }
     }
 
