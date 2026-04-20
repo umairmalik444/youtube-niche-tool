@@ -237,6 +237,32 @@
       padding: 0 0 12px;
     }
 
+    .tracker-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      padding: 0 0 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tracker-select-cell {
+      width: 40px;
+      min-width: 40px;
+      text-align: center;
+    }
+
+    .tracker-checkbox,
+    #selectAllTracker {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .tracker-table {
+      width: 100%;
+      min-width: 980px;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -1088,6 +1114,24 @@
         -webkit-overflow-scrolling: touch;
       }
 
+      .tracker-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .tracker-table th:first-child,
+      .tracker-table td:first-child {
+        position: sticky;
+        left: 0;
+        background: var(--card, #121b26);
+        z-index: 2;
+        min-width: 40px;
+      }
+
+      .tracker-table thead th:first-child {
+        z-index: 3;
+      }
+
       table {
         font-size: 0.85rem;
       }
@@ -1393,15 +1437,15 @@
     </section>
 
     <section id="trackerSection" class="app-section">
-      <section class="tracker-actions">
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+      <section id="trackerControlsSection" class="tracker-actions">
+        <div id="trackerPrimaryControls" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
           <button id="checkNowBtn" class="btn" type="button">Check All Now</button>
           <button id="addChannelBtn" class="btn btn-secondary" type="button">Add Channel Manually</button>
-          <label class="inline-toggle" for="autoCheckToggle">
+          <label id="autoTrackToggleWrap" class="inline-toggle" for="autoCheckToggle">
             <input id="autoCheckToggle" type="checkbox" /> Auto-Track
             <span id="autoTrackPulse" class="status-dot gray"></span>
           </label>
-          <label class="small-muted" for="autoCheckInterval">Check every</label>
+          <label id="autoCheckIntervalLabel" class="small-muted" for="autoCheckInterval">Check every</label>
           <select id="autoCheckInterval">
             <option value="30000" selected>30 sec (Ultra)</option>
             <option value="60000">1 min</option>
@@ -1412,7 +1456,7 @@
             <option value="900000">15 min</option>
             <option value="1800000">30 min</option>
           </select>
-          <label class="small-muted" for="alertWindowSelect">Just released window</label>
+          <label id="alertWindowLabel" class="small-muted" for="alertWindowSelect">Just released window</label>
           <select id="alertWindowSelect">
             <option value="60000">1 min</option>
             <option value="120000">2 min</option>
@@ -1428,9 +1472,10 @@
         <div id="trackerStatus" class="small-muted">Auto-tracking: OFF</div>
         <div id="trackerCycleStats" class="small-muted">Last cycle: -</div>
         <div id="trackerPerfBadge" class="small-muted">Performance: -</div>
+        <div id="memberTrackerInfo" class="small-muted" style="display:none;">Channels are monitored automatically every 5 minutes. You'll receive Slack alerts when new videos are published.</div>
       </section>
 
-      <section class="tracker-card" style="margin-top: 12px;">
+      <section id="trackerQuotaCard" class="tracker-card" style="margin-top: 12px;">
         <div style="padding: 10px 12px; border-bottom: 1px solid var(--line);">
           <strong>Tracking Quota Dashboard</strong>
         </div>
@@ -1449,7 +1494,7 @@
         </div>
       </section>
 
-      <section class="tracker-card" style="margin-top: 12px;">
+      <section id="trackerNicheGroupsCard" class="tracker-card" style="margin-top: 12px;">
         <div style="padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
           <strong>Niche Groups</strong>
           <div class="small-muted">Right click a niche tab to rename/delete</div>
@@ -1457,29 +1502,64 @@
         <div id="trackerNicheTabs" style="display: flex; gap: 8px; overflow-x: auto; padding: 10px 12px;"></div>
       </section>
 
-      <div class="tracker-grid">
-        <section class="tracker-card">
-          <h3>Tracked Channels</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Channel Name</th>
-                  <th>Country</th>
-                  <th>Subscribers</th>
-                  <th>Niche</th>
-                  <th>Date Added</th>
-                  <th>Last Checked</th>
-                  <th>Status</th>
-                  <th>Check</th>
-                  <th>Remove</th>
-                </tr>
-              </thead>
-              <tbody id="trackedBody"></tbody>
-            </table>
+      <section class="tracker-card" style="margin-top: 12px;">
+        <div class="meta" style="border-bottom: 1px solid var(--line);">
+          <span class="status" id="trackedChannelsCountLabel">Tracked Channels: 0</span>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button id="deleteSelectedChannelsBtn" class="btn btn-secondary" type="button">🗑️ Delete Selected</button>
+            <button id="trackerSyncNowBtn" class="btn" type="button">🔄 Sync Now</button>
           </div>
-        </section>
+        </div>
+        <h3>Tracked Channels</h3>
+        <div class="tracker-table-wrap">
+          <table class="tracker-table">
+            <thead>
+              <tr>
+                <th class="tracker-select-cell"><input type="checkbox" id="selectAllTracker" onchange="selectAllTrackerChannels(this)" /></th>
+                <th>Channel Name</th>
+                <th>Country</th>
+                <th>Subscribers</th>
+                <th>Niche</th>
+                <th>Date Added</th>
+                <th>Last Checked</th>
+                <th>Status</th>
+                <th>Check</th>
+                <th>Remove</th>
+              </tr>
+            </thead>
+            <tbody id="trackedBody"></tbody>
+          </table>
+        </div>
+      </section>
 
+      <section id="adminTrackerView" class="tracker-card" style="display:none; margin-top: 12px;">
+        <div class="meta" style="border-bottom: 1px solid var(--line);">
+          <h3 style="margin:0;">📊 Team Tracked Channels</h3>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <select id="teamChannelFilter">
+              <option value="">All Members</option>
+            </select>
+            <button id="refreshTeamTrackedChannelsBtn" class="btn btn-secondary" type="button">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Channel Name</th>
+                <th>Channel ID</th>
+                <th>Subscribers</th>
+                <th>Niche</th>
+                <th>Date Added</th>
+              </tr>
+            </thead>
+            <tbody id="trackerTeamChannelsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="tracker-grid">
         <section id="alertHistoryPanel" class="tracker-card">
           <h3 style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
             <span>Alert History (<span id="alertHistoryCount">0</span>)</span>
@@ -2374,6 +2454,10 @@
     const selectAllVisible = document.getElementById("selectAllVisible");
     const trackSelectedBtn = document.getElementById("trackSelectedBtn");
     const trackedBody = document.getElementById("trackedBody");
+    const selectAllTracker = document.getElementById("selectAllTracker");
+    const trackedChannelsCountLabel = document.getElementById("trackedChannelsCountLabel");
+    const deleteSelectedChannelsBtn = document.getElementById("deleteSelectedChannelsBtn");
+    const trackerSyncNowBtn = document.getElementById("trackerSyncNowBtn");
     const alertsHistoryBody = document.getElementById("alertsHistoryBody");
     const trackerStatus = document.getElementById("trackerStatus");
     const trackerCycleStats = document.getElementById("trackerCycleStats");
@@ -2381,15 +2465,28 @@
     const checkNowBtn = document.getElementById("checkNowBtn");
     const addChannelBtn = document.getElementById("addChannelBtn");
     const autoCheckToggle = document.getElementById("autoCheckToggle");
+    const autoTrackToggleWrap = document.getElementById("autoTrackToggleWrap");
     const autoTrackPulse = document.getElementById("autoTrackPulse");
     const autoCheckInterval = document.getElementById("autoCheckInterval");
+    const autoCheckIntervalLabel = document.getElementById("autoCheckIntervalLabel");
     const alertWindowSelect = document.getElementById("alertWindowSelect");
+    const alertWindowLabel = document.getElementById("alertWindowLabel");
     const ultraModeBadge = document.getElementById("ultraModeBadge");
     const exportTrackedBtn = document.getElementById("exportTrackedBtn");
     const importTrackedBtn = document.getElementById("importTrackedBtn");
     const importTrackedInput = document.getElementById("importTrackedInput");
     const trackerNicheTabs = document.getElementById("trackerNicheTabs");
+    const trackerControlsSection = document.getElementById("trackerControlsSection");
+    const trackerPrimaryControls = document.getElementById("trackerPrimaryControls");
+    const memberTrackerInfo = document.getElementById("memberTrackerInfo");
+    const trackerQuotaCard = document.getElementById("trackerQuotaCard");
+    const trackerNicheGroupsCard = document.getElementById("trackerNicheGroupsCard");
+    const adminTrackerView = document.getElementById("adminTrackerView");
+    const teamChannelFilter = document.getElementById("teamChannelFilter");
+    const refreshTeamTrackedChannelsBtn = document.getElementById("refreshTeamTrackedChannelsBtn");
+    const trackerTeamChannelsBody = document.getElementById("trackerTeamChannelsBody");
     const toggleAlertHistoryBtn = document.getElementById("toggleAlertHistoryBtn");
+    const alertHistoryPanel = document.getElementById("alertHistoryPanel");
     const alertHistoryContent = document.getElementById("alertHistoryContent");
     const alertHistoryCount = document.getElementById("alertHistoryCount");
     const clearAlertHistoryBtn = document.getElementById("clearAlertHistoryBtn");
@@ -2612,6 +2709,9 @@
     resultsBody.addEventListener("change", handleResultSelectionChange);
     trackedBody.addEventListener("click", handleTrackedRowActions);
     trackedBody.addEventListener("change", handleTrackedRowChange);
+    selectAllTracker.addEventListener("change", (event) => selectAllTrackerChannels(event.target));
+    deleteSelectedChannelsBtn.addEventListener("click", deleteSelectedChannels);
+    trackerSyncNowBtn.addEventListener("click", () => syncToGoogleSheet());
     checkNowBtn.addEventListener("click", () => checkTrackedChannelsForUploads({ manual: true }));
     addChannelBtn.addEventListener("click", addChannelManuallyPrompt);
     autoCheckToggle.addEventListener("change", updateAutoCheckConfig);
@@ -2667,6 +2767,8 @@
     refreshTeamDashboardBtn.addEventListener("click", fetchDashboardData);
     teamFilterMember.addEventListener("change", renderTeamDashboard);
     teamFilterNiche.addEventListener("change", renderTeamDashboard);
+    teamChannelFilter.addEventListener("change", loadTeamTrackedChannels);
+    refreshTeamTrackedChannelsBtn.addEventListener("click", loadTeamTrackedChannels);
     saveMemberProfileBtn.addEventListener("click", saveMemberProfileFromSettings);
     testGoogleSheetBtn.addEventListener("click", testGoogleSheetConnection);
     syncNowBtn.addEventListener("click", syncToGoogleSheet);
@@ -2736,6 +2838,12 @@
       tabSettings.classList.toggle("active", isSettings);
       if (isTracker) {
         updateTrackerQuotaDashboard();
+        if (isAdmin()) {
+          adminTrackerView.style.display = "block";
+          loadTeamTrackedChannels();
+        } else {
+          adminTrackerView.style.display = "none";
+        }
       }
       if (isAlerts) {
         renderAlertsPage();
@@ -4815,15 +4923,137 @@
       }
     }
 
+    function getSelectedTrackerChannelIds() {
+      return Array.from(document.querySelectorAll(".tracker-checkbox:checked"))
+        .map((checkbox) => String(checkbox.dataset.channelId || "").trim())
+        .filter(Boolean);
+    }
+
+    function syncSelectAllTrackerState() {
+      if (!selectAllTracker) return;
+      const checkboxes = Array.from(document.querySelectorAll(".tracker-checkbox"));
+      if (!checkboxes.length) {
+        selectAllTracker.checked = false;
+        selectAllTracker.indeterminate = false;
+        return;
+      }
+      const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+      selectAllTracker.checked = checkedCount === checkboxes.length;
+      selectAllTracker.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+    }
+
+    function selectAllTrackerChannels(toggle) {
+      const checked = !!toggle.checked;
+      document.querySelectorAll(".tracker-checkbox").forEach((checkbox) => {
+        checkbox.checked = checked;
+      });
+      syncSelectAllTrackerState();
+    }
+    window.selectAllTrackerChannels = selectAllTrackerChannels;
+
+    function deleteSelectedChannels() {
+      const selectedIds = getSelectedTrackerChannelIds();
+      if (selectedIds.length === 0) {
+        showToast("No channels selected");
+        return;
+      }
+
+      if (!confirm(`Delete ${selectedIds.length} channel(s)?`)) return;
+
+      selectedIds.forEach((channelId) => {
+        if (trackedChannels[channelId]) {
+          delete trackedChannels[channelId];
+        }
+        delete trackerExpandedRows[channelId];
+        clearSeenVideosForChannel(channelId);
+      });
+
+      saveTrackedChannels();
+      renderTrackedChannels();
+      showToast(`✅ ${selectedIds.length} channel(s) deleted`);
+    }
+
+    async function loadTeamTrackedChannels() {
+      if (!isAdmin() || !adminTrackerView) return;
+
+      const sheetUrl = getGoogleSheetEndpoint() || String(GOOGLE_SHEET_URL || "").trim();
+      if (!sheetUrl) return;
+
+      try {
+        const response = await fetch(sheetUrl, { redirect: "follow" });
+        const data = await response.json().catch(() => ({}));
+
+        if (data.channels && Array.isArray(data.channels)) {
+          renderTeamTrackedChannelsTable(data.channels);
+        }
+      } catch (error) {
+        console.log("Failed to load team channels:", error.message);
+      }
+    }
+
+    function renderTeamTrackedChannelsTable(channels) {
+      if (!trackerTeamChannelsBody || !teamChannelFilter) return;
+
+      const memberNames = Array.from(new Set(
+        (channels || [])
+          .map((channel) => String(channel.memberName || channel["Member Name"] || "").trim())
+          .filter(Boolean)
+      )).sort((a, b) => a.localeCompare(b));
+
+      const selectedMember = String(teamChannelFilter.value || "").trim();
+      teamChannelFilter.innerHTML = '<option value="">All Members</option>';
+      memberNames.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        if (name === selectedMember) option.selected = true;
+        teamChannelFilter.appendChild(option);
+      });
+
+      const filterMember = String(teamChannelFilter.value || "").trim();
+      trackerTeamChannelsBody.innerHTML = "";
+
+      const filtered = (channels || []).filter((channel) => {
+        const memberName = String(channel.memberName || channel["Member Name"] || "").trim();
+        if (filterMember && memberName !== filterMember) return false;
+        return true;
+      });
+
+      if (!filtered.length) {
+        const row = document.createElement("tr");
+        row.innerHTML = '<td colspan="6" class="small-muted">No team tracked channels found.</td>';
+        trackerTeamChannelsBody.appendChild(row);
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      filtered.forEach((channel) => {
+        const memberName = String(channel.memberName || channel["Member Name"] || "");
+        const row = document.createElement("tr");
+        row.innerHTML = '<td>' + escapeHtml(memberName) + '</td>'
+          + '<td>' + escapeHtml(channel.channelTitle || channel["Channel Name"] || "") + '</td>'
+          + '<td>' + escapeHtml(channel.channelId || channel["Channel ID"] || "") + '</td>'
+          + '<td>' + formatNumber(channel.subscriberCount || channel["Subscribers"] || 0) + '</td>'
+          + '<td>' + escapeHtml(channel.nicheKeyword || channel["Niche"] || "") + '</td>'
+          + '<td>' + escapeHtml(channel.dateAdded || channel["Date Added"] || "") + '</td>';
+        fragment.appendChild(row);
+      });
+      trackerTeamChannelsBody.appendChild(fragment);
+    }
+
     function renderTrackedChannels() {
       updateTrackerQuotaDashboard();
       renderTrackerNicheTabs();
       const channels = getFilteredTrackedChannels();
+      if (trackedChannelsCountLabel) {
+        trackedChannelsCountLabel.textContent = `Tracked Channels: ${channels.length}`;
+      }
       trackedBody.innerHTML = "";
       if (!channels.length) {
         const tr = document.createElement("tr");
-        tr.innerHTML = '<td colspan="9" class="small-muted">No tracked channels in this niche.</td>';
+        tr.innerHTML = '<td colspan="10" class="small-muted">No tracked channels in this niche.</td>';
         trackedBody.appendChild(tr);
+        syncSelectAllTrackerState();
         return;
       }
 
@@ -4846,6 +5076,7 @@
         const row = document.createElement("tr");
         row.setAttribute("data-channel-row", channel.channelId);
         row.innerHTML = `
+          <td class="tracker-select-cell"><input type="checkbox" class="tracker-checkbox" data-channel-id="${channel.channelId}" /></td>
           <td><a href="https://www.youtube.com/channel/${channel.channelId}" target="_blank" rel="noopener noreferrer">${escapeHtml(channel.channelTitle)}</a>${apiWarning}</td>
           <td>${escapeHtml(channel.country || "-")}</td>
           <td>${formatNumber(channel.subscriberCount)}</td>
@@ -4863,7 +5094,7 @@
           expandedRow.className = "tracker-row-expanded";
           if (expanded.error) {
             expandedRow.innerHTML = `
-              <td colspan="9">
+              <td colspan="10">
                 <div class="tracker-expanded-wrap">
                   <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
                     <strong>Latest 24-hour uploads</strong>
@@ -4875,7 +5106,7 @@
             `;
           } else if (!expanded.videos || !expanded.videos.length) {
             expandedRow.innerHTML = `
-              <td colspan="9">
+              <td colspan="10">
                 <div class="tracker-expanded-wrap">
                   <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
                     <strong>Latest 24-hour uploads</strong>
@@ -4893,7 +5124,7 @@
               </tr>
             `).join("");
             expandedRow.innerHTML = `
-              <td colspan="9">
+              <td colspan="10">
                 <div class="tracker-expanded-wrap">
                   <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
                     <strong>Latest 24-hour uploads (${expanded.videos.length})</strong>
@@ -4918,6 +5149,7 @@
         }
       });
       trackedBody.appendChild(fragment);
+      syncSelectAllTrackerState();
     }
 
     function renderAlertHistory() {
@@ -7033,6 +7265,24 @@
         if (autoSyncWrap) autoSyncWrap.style.display = admin ? "" : "none";
         autoSyncToggle.disabled = !admin;
       }
+
+      if (trackerPrimaryControls) trackerPrimaryControls.style.display = admin ? "flex" : "flex";
+      if (checkNowBtn) checkNowBtn.style.display = admin ? "" : "none";
+      if (addChannelBtn) addChannelBtn.style.display = admin ? "" : "none";
+      if (autoTrackToggleWrap) autoTrackToggleWrap.style.display = admin ? "" : "none";
+      if (autoCheckIntervalLabel) autoCheckIntervalLabel.style.display = admin ? "" : "none";
+      if (autoCheckInterval) autoCheckInterval.style.display = admin ? "" : "none";
+      if (alertWindowLabel) alertWindowLabel.style.display = admin ? "" : "none";
+      if (alertWindowSelect) alertWindowSelect.style.display = admin ? "" : "none";
+      if (ultraModeBadge) ultraModeBadge.style.display = admin ? "" : "none";
+      if (trackerStatus) trackerStatus.style.display = admin ? "" : "none";
+      if (trackerCycleStats) trackerCycleStats.style.display = admin ? "" : "none";
+      if (trackerPerfBadge) trackerPerfBadge.style.display = admin ? "" : "none";
+      if (trackerQuotaCard) trackerQuotaCard.style.display = admin ? "" : "none";
+      if (trackerNicheGroupsCard) trackerNicheGroupsCard.style.display = admin ? "" : "none";
+      if (alertHistoryPanel) alertHistoryPanel.style.display = admin ? "" : "none";
+      if (memberTrackerInfo) memberTrackerInfo.style.display = admin ? "none" : "block";
+      if (adminTrackerView) adminTrackerView.style.display = admin ? "block" : "none";
 
       renderSlackConfigStatus();
     }
