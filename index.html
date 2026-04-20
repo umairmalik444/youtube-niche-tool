@@ -244,6 +244,40 @@
       -webkit-overflow-scrolling: touch;
     }
 
+    .manual-add-panel {
+      display: none;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 24, 34, 0.65);
+    }
+
+    .manual-add-panel.open {
+      display: block;
+    }
+
+    .manual-add-form {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.8fr) minmax(160px, 1fr) auto auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .manual-add-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .manual-add-field input {
+      width: 100%;
+    }
+
+    .manual-add-actions {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+    }
+
     .tracker-select-cell {
       width: 40px;
       min-width: 40px;
@@ -1119,6 +1153,21 @@
         -webkit-overflow-scrolling: touch;
       }
 
+      .manual-add-form {
+        grid-template-columns: 1fr;
+      }
+
+      .manual-add-actions {
+        flex-direction: column;
+      }
+
+      .manual-add-field input,
+      .manual-add-actions .btn,
+      .manual-add-actions .btn-secondary {
+        width: 100%;
+        min-height: 44px;
+      }
+
       .tracker-table th:first-child,
       .tracker-table td:first-child {
         position: sticky;
@@ -1440,7 +1489,6 @@
       <section id="trackerControlsSection" class="tracker-actions">
         <div id="trackerPrimaryControls" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
           <button id="checkNowBtn" class="btn" type="button">Check All Now</button>
-          <button id="addChannelBtn" class="btn btn-secondary" type="button">Add Channel Manually</button>
           <label id="autoTrackToggleWrap" class="inline-toggle" for="autoCheckToggle">
             <input id="autoCheckToggle" type="checkbox" /> Auto-Track
             <span id="autoTrackPulse" class="status-dot gray"></span>
@@ -1506,9 +1554,26 @@
         <div class="meta" style="border-bottom: 1px solid var(--line);">
           <span class="status" id="trackedChannelsCountLabel">Tracked Channels: 0</span>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button id="addChannelBtn" class="btn btn-secondary" type="button">➕ Add Channel Manually</button>
             <button id="deleteSelectedChannelsBtn" class="btn btn-secondary" type="button">🗑️ Delete Selected</button>
             <button id="trackerSyncNowBtn" class="btn" type="button">🔄 Sync Now</button>
           </div>
+        </div>
+        <div id="manualAddChannelPanel" class="manual-add-panel">
+          <form id="manualAddChannelForm" class="manual-add-form">
+            <label class="manual-add-field" for="manualChannelInput">
+              <span class="small-muted">YouTube Channel URL or Channel ID</span>
+              <input id="manualChannelInput" type="text" placeholder="https://www.youtube.com/@channelname or UCxxxxxx" autocomplete="off" />
+            </label>
+            <label class="manual-add-field" for="manualChannelNicheInput">
+              <span class="small-muted">Niche Tag</span>
+              <input id="manualChannelNicheInput" type="text" placeholder="epoxy, woodworking" autocomplete="off" />
+            </label>
+            <div class="manual-add-actions">
+              <button id="manualAddChannelSubmitBtn" class="btn" type="submit">Add Channel</button>
+              <button id="manualAddChannelCancelBtn" class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+          </form>
         </div>
         <h3>Tracked Channels</h3>
         <div class="tracker-table-wrap">
@@ -2464,6 +2529,12 @@
     const trackerPerfBadge = document.getElementById("trackerPerfBadge");
     const checkNowBtn = document.getElementById("checkNowBtn");
     const addChannelBtn = document.getElementById("addChannelBtn");
+    const manualAddChannelPanel = document.getElementById("manualAddChannelPanel");
+    const manualAddChannelForm = document.getElementById("manualAddChannelForm");
+    const manualChannelInput = document.getElementById("manualChannelInput");
+    const manualChannelNicheInput = document.getElementById("manualChannelNicheInput");
+    const manualAddChannelSubmitBtn = document.getElementById("manualAddChannelSubmitBtn");
+    const manualAddChannelCancelBtn = document.getElementById("manualAddChannelCancelBtn");
     const autoCheckToggle = document.getElementById("autoCheckToggle");
     const autoTrackToggleWrap = document.getElementById("autoTrackToggleWrap");
     const autoTrackPulse = document.getElementById("autoTrackPulse");
@@ -2714,6 +2785,8 @@
     trackerSyncNowBtn.addEventListener("click", () => syncToGoogleSheet());
     checkNowBtn.addEventListener("click", () => checkTrackedChannelsForUploads({ manual: true }));
     addChannelBtn.addEventListener("click", addChannelManuallyPrompt);
+    manualAddChannelForm.addEventListener("submit", submitManualAddChannel);
+    manualAddChannelCancelBtn.addEventListener("click", () => toggleManualAddChannelPanel(false));
     autoCheckToggle.addEventListener("change", updateAutoCheckConfig);
     autoCheckInterval.addEventListener("change", updateAutoCheckConfig);
     alertWindowSelect.addEventListener("change", updateAutoCheckConfig);
@@ -6461,7 +6534,6 @@
       };
       saveSeenVideosForChannel(channelId, seenVideoIds);
       saveTrackedChannels();
-      showToast(`Channel added - ${seenVideoIds.length} existing videos indexed.`);
       return true;
     }
 
@@ -6521,6 +6593,10 @@
       const directId = input.match(/^(UC[A-Za-z0-9_-]{20,30})$/i);
       if (directId) return { kind: "id", value: directId[1] };
 
+      if (!/^https?:\/\//i.test(input) && !/^@/.test(input)) {
+        return { kind: "invalid", value: "" };
+      }
+
       const channelIdInUrl = input.match(/[?&]channel_id=(UC[A-Za-z0-9_-]{20,30})/i)
         || input.match(/\/channel\/(UC[A-Za-z0-9_-]{20,30})/i);
       if (channelIdInUrl) return { kind: "id", value: channelIdInUrl[1] };
@@ -6533,10 +6609,10 @@
       if (userInUrl) return { kind: "username", value: userInUrl[1] };
 
       const customInUrl = input.match(/youtube\.com\/c\/([A-Za-z0-9._-]+)/i)
-        || input.match(/youtube\.com\/([^/?#]+)$/i);
+        || input.match(/youtube\.com\/([^/?#]+)\/?(?:[?#].*)?$/i);
       if (customInUrl) return { kind: "query", value: customInUrl[1] };
 
-      return { kind: "query", value: input };
+      return { kind: "invalid", value: "" };
     }
 
     async function resolveChannelIdFromInput(rawInput) {
@@ -6576,24 +6652,78 @@
     }
 
     async function addChannelManuallyPrompt() {
-      const raw = prompt("Enter YouTube channel ID or channel URL");
-      const nicheTag = normalizeNicheTag(prompt("Enter niche/keyword tag", "Uncategorized"));
-      if (!hasConfiguredAPIKeys()) {
-        showToast("Add at least one API key in YOUTUBE_API_KEYS or the API key field first.");
+      toggleManualAddChannelPanel(!(manualAddChannelPanel && manualAddChannelPanel.classList.contains("open")));
+    }
+
+    function toggleManualAddChannelPanel(forceOpen) {
+      if (!manualAddChannelPanel) return;
+      const shouldOpen = typeof forceOpen === "boolean"
+        ? forceOpen
+        : !manualAddChannelPanel.classList.contains("open");
+      manualAddChannelPanel.classList.toggle("open", shouldOpen);
+      if (addChannelBtn) {
+        addChannelBtn.textContent = shouldOpen ? "✕ Close Manual Add" : "➕ Add Channel Manually";
+      }
+      if (shouldOpen) {
+        if (manualChannelInput) manualChannelInput.focus();
+      } else if (manualAddChannelForm) {
+        manualAddChannelForm.reset();
+      }
+    }
+
+    async function submitManualAddChannel(event) {
+      event.preventDefault();
+
+      const rawInput = String(manualChannelInput?.value || "").trim();
+      const nicheTag = normalizeNicheTag(String(manualChannelNicheInput?.value || "").trim());
+      const parsed = parseChannelInput(rawInput);
+
+      if (parsed.kind === "none" || parsed.kind === "invalid") {
+        showToast("Invalid YouTube channel URL or ID");
         return;
       }
+
+      if (!hasConfiguredAPIKeys()) {
+        showToast("Failed to fetch channel details. Check your API key.");
+        return;
+      }
+
+      if (manualAddChannelSubmitBtn) manualAddChannelSubmitBtn.disabled = true;
+
       try {
-        const channelId = await resolveChannelIdFromInput(raw);
+        const channelId = await resolveChannelIdFromInput(rawInput);
         if (!channelId) {
-          showToast("Invalid channel ID or URL.");
+          showToast("Channel not found");
           return;
         }
+
+        if (trackedChannels[channelId]) {
+          showToast("Channel already being tracked");
+          return;
+        }
+
         const metadata = await fetchChannelMetadataById(channelId);
         const added = await addChannelToTracker(metadata, nicheTag);
         renderTrackedChannels();
-        if (!added) showToast("Channel is already tracked.");
+
+        if (!added) {
+          showToast("Channel already being tracked");
+          return;
+        }
+
+        toggleManualAddChannelPanel(false);
+        showToast(`✅ Channel added: ${metadata.channelTitle}`);
       } catch (error) {
-        showToast(`Failed to add channel: ${error.message}`);
+        const message = String(error?.message || "").trim();
+        if (/Channel not found/i.test(message)) {
+          showToast("Channel not found");
+        } else if (/No YouTube API key configured|API Error|HTTP|quota|key/i.test(message)) {
+          showToast("Failed to fetch channel details. Check your API key.");
+        } else {
+          showToast("Failed to fetch channel details. Check your API key.");
+        }
+      } finally {
+        if (manualAddChannelSubmitBtn) manualAddChannelSubmitBtn.disabled = false;
       }
     }
 
@@ -7268,7 +7398,6 @@
 
       if (trackerPrimaryControls) trackerPrimaryControls.style.display = admin ? "flex" : "flex";
       if (checkNowBtn) checkNowBtn.style.display = admin ? "" : "none";
-      if (addChannelBtn) addChannelBtn.style.display = admin ? "" : "none";
       if (autoTrackToggleWrap) autoTrackToggleWrap.style.display = admin ? "" : "none";
       if (autoCheckIntervalLabel) autoCheckIntervalLabel.style.display = admin ? "" : "none";
       if (autoCheckInterval) autoCheckInterval.style.display = admin ? "" : "none";
