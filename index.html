@@ -759,58 +759,6 @@
       padding: 16px 24px;
     }
 
-    .seed-keyword-panel {
-      padding: 0 24px 16px;
-      display: grid;
-      gap: 10px;
-    }
-
-    .seed-keyword-panel .field {
-      display: grid;
-      gap: 6px;
-      max-width: 680px;
-    }
-
-    .seed-suggestions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .seed-tag {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 36px;
-      padding: 6px 12px;
-      background: rgba(61, 217, 165, 0.15);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      color: var(--muted);
-      transition: all 0.2s;
-      font-family: inherit;
-    }
-
-    .seed-tag:hover,
-    .seed-tag:focus-visible {
-      background: rgba(61, 217, 165, 0.3);
-      color: var(--accent);
-      border-color: var(--accent);
-      outline: none;
-    }
-
-    .micro-summary {
-      padding: 0 24px 8px;
-      color: var(--muted);
-      display: none;
-    }
-
-    .micro-summary.open {
-      display: block;
-    }
-
     .niche-category-card {
       border: 1px solid var(--line);
       background: #101a25;
@@ -1005,49 +953,6 @@
     .score-green { color: #69ecad; font-weight: 700; }
     .score-yellow { color: #ffd46a; font-weight: 700; }
     .score-red { color: #ff8d8d; font-weight: 700; }
-
-    .competition-chip,
-    .insight-chip {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      border: 1px solid transparent;
-      white-space: nowrap;
-    }
-
-    .competition-low {
-      color: #69ecad;
-      background: rgba(69, 219, 143, 0.16);
-      border-color: rgba(69, 219, 143, 0.28);
-    }
-
-    .competition-medium {
-      color: #ffd46a;
-      background: rgba(255, 212, 106, 0.14);
-      border-color: rgba(255, 212, 106, 0.26);
-    }
-
-    .competition-high {
-      color: #ff9a9a;
-      background: rgba(255, 106, 106, 0.14);
-      border-color: rgba(255, 106, 106, 0.26);
-    }
-
-    .insight-hot {
-      color: #ffd46a;
-      background: rgba(255, 212, 106, 0.16);
-      border-color: rgba(255, 212, 106, 0.3);
-    }
-
-    .insight-gem {
-      color: #8ee7ff;
-      background: rgba(98, 201, 255, 0.14);
-      border-color: rgba(98, 201, 255, 0.28);
-    }
 
     .saved-panel {
       margin: 14px 24px;
@@ -1263,18 +1168,6 @@
         min-height: 44px;
       }
 
-      .seed-keyword-panel {
-        padding: 0 16px 16px;
-      }
-
-      .seed-keyword-panel .field {
-        max-width: none;
-      }
-
-      .seed-tag {
-        min-height: 44px;
-      }
-
       .tracker-table th:first-child,
       .tracker-table td:first-child {
         position: sticky;
@@ -1343,12 +1236,6 @@
 
       .niche-card-grid {
         padding: 12px;
-      }
-
-      .seed-keyword-panel,
-      .micro-summary {
-        padding-left: 12px;
-        padding-right: 12px;
       }
 
       .niche-filter-bar {
@@ -1779,15 +1666,6 @@
 
       <div id="nicheCategoryCards" class="niche-card-grid"></div>
 
-      <section class="seed-keyword-panel">
-        <div class="field">
-          <label for="seedKeyword">Seed Keyword (optional - drill into micro niches)</label>
-          <input type="text" id="seedKeyword" placeholder="e.g., ASMR, epoxy, woodworking" autocomplete="off" />
-        </div>
-        <div id="seedSuggestions" class="seed-suggestions"></div>
-        <div class="small-muted">Add a seed keyword to scan micro niches inside the selected category only. Leave it blank to keep the normal broad category scan.</div>
-      </section>
-
       <section id="nicheSettings" class="niche-settings">
         <button id="nicheSettingsToggle" class="niche-settings-toggle" type="button">Scan Settings (click to expand)</button>
         <div class="niche-settings-body">
@@ -1847,9 +1725,7 @@
         <div id="scanMetaText" class="small-muted" style="margin-top: 6px;">-</div>
       </section>
 
-      <div id="microSummary" class="micro-summary"></div>
-
-      <section id="nicheFilterBar" class="niche-filter-bar">
+      <section class="niche-filter-bar">
         <div>
           <label for="nicheMinScore">Minimum Niche Score: <span id="nicheMinScoreValue">0</span></label>
           <input id="nicheMinScore" type="range" min="0" max="100" value="0" />
@@ -1879,7 +1755,22 @@
 
       <div class="table-wrap">
         <table>
-          <thead id="nicheResultsHead"></thead>
+          <thead>
+            <tr>
+              <th onclick="sortNicheResults('rank')">#</th>
+              <th onclick="sortNicheResults('keyword')">Niche Keyword</th>
+              <th onclick="sortNicheResults('nicheScore')">Niche Score</th>
+              <th onclick="sortNicheResults('repostabilityPct')">Repostability</th>
+              <th onclick="sortNicheResults('frequency')">Frequency</th>
+              <th onclick="sortNicheResults('avgViews')">Avg Views per Short</th>
+              <th onclick="sortNicheResults('topViews')">Top Short Views</th>
+              <th onclick="sortNicheResults('count1mPlus')">Shorts with 1M+</th>
+              <th onclick="sortNicheResults('uniqueChannels')">Unique Channels</th>
+              <th onclick="sortNicheResults('smallChannels')">Small Channels</th>
+              <th onclick="sortNicheResults('statusOrder')">Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody id="nicheResultsBody"></tbody>
         </table>
       </div>
@@ -2759,8 +2650,6 @@
     const googleSheetsConnectionSection = document.getElementById("googleSheetsConnectionSection");
     const syncActivitySection = document.getElementById("syncActivitySection");
     const nicheCategoryCards = document.getElementById("nicheCategoryCards");
-    const seedKeywordInput = document.getElementById("seedKeyword");
-    const seedSuggestions = document.getElementById("seedSuggestions");
     const nicheSettings = document.getElementById("nicheSettings");
     const nicheSettingsToggle = document.getElementById("nicheSettingsToggle");
     const nicheRegion = document.getElementById("nicheRegion");
@@ -2788,12 +2677,9 @@
     const statusSkip = document.getElementById("statusSkip");
     const nicheKeywordFilter = document.getElementById("nicheKeywordFilter");
     const resetNicheFiltersBtn = document.getElementById("resetNicheFiltersBtn");
-    const nicheFilterBar = document.getElementById("nicheFilterBar");
     const nicheShowingCounter = document.getElementById("nicheShowingCounter");
-    const nicheResultsHead = document.getElementById("nicheResultsHead");
     const nicheResultsBody = document.getElementById("nicheResultsBody");
     const nicheEmptyState = document.getElementById("nicheEmptyState");
-    const microSummary = document.getElementById("microSummary");
     const nicheCumulativeInfo = document.getElementById("nicheCumulativeInfo");
     const savedNichesPanel = document.getElementById("savedNichesPanel");
     const savedNichesToggle = document.getElementById("savedNichesToggle");
@@ -2834,8 +2720,6 @@
     let nicheResults = [];
     let nicheFilteredResults = [];
     let nicheSortState = { field: "nicheScore", direction: "desc" };
-    let nicheResultsMode = "broad";
-    let currentMicroSeedKeyword = "";
     let selectedNicheCategory = null;
     let nicheScanInProgress = false;
     let nicheScanCancelRequested = false;
@@ -2859,14 +2743,6 @@
       { id: 28, name: "Science & Technology", description: "3D printing, gadgets, laser, CNC", seedQuery: "gadget" },
       { id: 27, name: "Education", description: "Fun facts, experiments, did you know", seedQuery: "did you know" }
     ];
-
-    const categorySeedSuggestions = {
-      "24": ["ASMR", "satisfying", "compilation", "reaction", "prank", "challenge"],
-      "26": ["epoxy", "woodworking", "restoration", "cleaning", "DIY", "painting", "gardening"],
-      "22": ["transformation", "backyard", "van life", "tiny house", "before after"],
-      "28": ["3D printing", "gadgets", "laser", "CNC", "robot"],
-      "27": ["experiment", "facts", "did you know", "science"]
-    };
 
     const stopWords = new Set(["the","a","an","is","it","this","that","you","i","my","so","do","in","on","at","to","for","of","and","or","but","not","with","from","will","wont","dont","cant","how","what","why","when","where","who","most","very","just","more","before","after","watch","wait","until","part","vs","ft","like","get","got","go","going","make","making","made","see","look","take","new","try","ever","even","one","way","day","time","things","thing","every","never","first","last","best","worst","real","really","still","back","into","been","about","these","those","them","only","over","than","should","could","would","much","many","some","your","our","their","his","her","shorts","short","video","subscribe","viral","fyp","foryou","tiktok","youtube"]);
 
@@ -2931,7 +2807,6 @@
     tabTeam.addEventListener("click", () => switchTab("team"));
     tabSettings.addEventListener("click", () => switchTab("settings"));
     nicheSettingsToggle.addEventListener("click", () => nicheSettings.classList.toggle("open"));
-    seedSuggestions.addEventListener("click", handleSeedSuggestionClick);
     discoverNichesBtn.addEventListener("click", prepareNicheScan);
     startNicheScanBtn.addEventListener("click", startNicheScan);
     closeScanConfirmBtn.addEventListener("click", () => scanConfirm.classList.remove("open"));
@@ -2993,7 +2868,6 @@
     refreshTrackSelectedButton();
     applyAutoCheckTimer();
     renderNicheCategoryCards();
-    renderNicheResultsHeader();
     renderSavedNiches();
     renderPastScansDropdown();
     resetNicheFilters();
@@ -3169,185 +3043,6 @@
       nicheCumulativeInfo.textContent = `Total niches discovered today: ${total} (this scan: ${thisScan} new)`;
     }
 
-    function getSeedKeywordValue() {
-      return String(seedKeywordInput?.value || "").trim();
-    }
-
-    function isMicroNicheMode() {
-      return nicheResultsMode === "micro";
-    }
-
-    function renderSeedSuggestions() {
-      if (!seedSuggestions) return;
-      seedSuggestions.innerHTML = "";
-      const categoryId = String(selectedNicheCategory?.id || "");
-      const suggestions = categorySeedSuggestions[categoryId] || [];
-      if (!suggestions.length) return;
-
-      const fragment = document.createDocumentFragment();
-      suggestions.forEach((keyword) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "seed-tag";
-        button.setAttribute("data-seed-suggestion", keyword);
-        button.textContent = keyword;
-        fragment.appendChild(button);
-      });
-      seedSuggestions.appendChild(fragment);
-    }
-
-    function handleSeedSuggestionClick(event) {
-      const tag = event.target.closest("button[data-seed-suggestion]");
-      if (!tag || !seedKeywordInput) return;
-      seedKeywordInput.value = tag.getAttribute("data-seed-suggestion") || "";
-      seedKeywordInput.focus();
-    }
-
-    function renderNicheResultsHeader() {
-      if (!nicheResultsHead) return;
-      nicheResultsHead.innerHTML = isMicroNicheMode()
-        ? `
-            <tr>
-              <th onclick="sortNicheResults('keyword')">Micro Niche</th>
-              <th onclick="sortNicheResults('videoCount')">Videos Found</th>
-              <th onclick="sortNicheResults('avgViews')">Avg Views</th>
-              <th onclick="sortNicheResults('channelCount')">Channels</th>
-              <th onclick="sortNicheResults('viralityScore')">Virality Score</th>
-              <th onclick="sortNicheResults('competitionRank')">Competition</th>
-              <th>Action</th>
-            </tr>
-          `
-        : `
-            <tr>
-              <th onclick="sortNicheResults('rank')">#</th>
-              <th onclick="sortNicheResults('keyword')">Niche Keyword</th>
-              <th onclick="sortNicheResults('nicheScore')">Niche Score</th>
-              <th onclick="sortNicheResults('repostabilityPct')">Repostability</th>
-              <th onclick="sortNicheResults('frequency')">Frequency</th>
-              <th onclick="sortNicheResults('avgViews')">Avg Views per Short</th>
-              <th onclick="sortNicheResults('topViews')">Top Short Views</th>
-              <th onclick="sortNicheResults('count1mPlus')">Shorts with 1M+</th>
-              <th onclick="sortNicheResults('uniqueChannels')">Unique Channels</th>
-              <th onclick="sortNicheResults('smallChannels')">Small Channels</th>
-              <th onclick="sortNicheResults('statusOrder')">Status</th>
-              <th>Actions</th>
-            </tr>
-          `;
-    }
-
-    function updateNicheModeUi() {
-      renderNicheResultsHeader();
-      if (nicheFilterBar) nicheFilterBar.style.display = isMicroNicheMode() ? "none" : "grid";
-      if (microSummary) microSummary.classList.toggle("open", isMicroNicheMode() && nicheResults.length > 0);
-    }
-
-    function getCompetitionInfo(channelCount) {
-      const count = Number(channelCount || 0);
-      if (count > 20) return { label: "High", className: "competition-high", rank: 3 };
-      if (count >= 10) return { label: "Medium", className: "competition-medium", rank: 2 };
-      return { label: "Low", className: "competition-low", rank: 1 };
-    }
-
-    function getViralityClass(score) {
-      const value = Number(score || 0);
-      if (value >= 10000) return "score-green";
-      if (value >= 4000) return "score-yellow";
-      return "score-red";
-    }
-
-    function getMicroInsightBadges(item) {
-      const badges = [];
-      if (Number(item.avgViews || 0) > 50000 && String(item.competition || "") === "Low") {
-        badges.push('<span class="insight-chip insight-hot">🔥 Hot</span>');
-      }
-      if (Number(item.avgViews || 0) > 20000 && Number(item.channelCount || 0) < 5) {
-        badges.push('<span class="insight-chip insight-gem">💎 Hidden Gem</span>');
-      }
-      return badges.join(" ");
-    }
-
-    function escapeRegExp(value) {
-      return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    }
-
-    function extractMicroNiches(videos, seedKeyword) {
-      const phraseCount = {};
-      const phraseStats = {};
-      const normalizedSeed = String(seedKeyword || "").trim();
-      const seedPattern = new RegExp(escapeRegExp(normalizedSeed), "gi");
-      const microStopWords = new Set([
-        "the","a","an","is","are","was","for","and","or","but","in","on","at","to","of","with","this","that","my","your","its","very","most","so","just","how","what","when","who","why","shorts","short","video","viral","trending","new","best","top","amazing","incredible","satisfying"
-      ]);
-
-      videos.forEach((video) => {
-        let title = String(video.title || "").toLowerCase();
-        title = title.replace(seedPattern, " ").trim();
-        const words = title.split(/[\s,.|!?#@()\[\]{}:/\\&+-]+/).filter((word) => {
-          return word.length > 2 && !microStopWords.has(word);
-        });
-
-        const registerPhrase = (phrase) => {
-          const normalizedPhrase = String(phrase || "").trim();
-          if (!normalizedPhrase) return;
-          if (!phraseCount[normalizedPhrase]) {
-            phraseCount[normalizedPhrase] = 0;
-            phraseStats[normalizedPhrase] = { totalViews: 0, channels: new Set(), videos: [] };
-          }
-          phraseCount[normalizedPhrase] += 1;
-          phraseStats[normalizedPhrase].totalViews += Number(video.viewCount || 0);
-          phraseStats[normalizedPhrase].channels.add(video.channelId);
-          phraseStats[normalizedPhrase].videos.push(video);
-        };
-
-        for (let index = 0; index < words.length - 1; index++) {
-          registerPhrase(`${words[index]} ${words[index + 1]}`);
-        }
-
-        for (let index = 0; index < words.length - 2; index++) {
-          registerPhrase(`${words[index]} ${words[index + 1]} ${words[index + 2]}`);
-        }
-
-        words.forEach((word) => {
-          if (word.length > 3) registerPhrase(word);
-        });
-      });
-
-      const microNiches = [];
-      Object.keys(phraseCount).forEach((phrase) => {
-        if (phraseCount[phrase] < 3) return;
-        const stats = phraseStats[phrase];
-        const avgViews = Math.round(stats.totalViews / phraseCount[phrase]);
-        const channelCount = stats.channels.size;
-        const viralityScore = channelCount > 0 ? Math.round(avgViews / channelCount) : 0;
-        const competitionInfo = getCompetitionInfo(channelCount);
-        const cleanPhrase = phrase.startsWith(normalizedSeed.toLowerCase()) ? phrase : `${normalizedSeed} ${phrase}`;
-
-        microNiches.push({
-          rank: 0,
-          keyword: cleanPhrase.trim(),
-          nicheClean: phrase,
-          videoCount: phraseCount[phrase],
-          avgViews,
-          channelCount,
-          viralityScore,
-          competition: competitionInfo.label,
-          competitionClass: competitionInfo.className,
-          competitionRank: competitionInfo.rank,
-          topVideos: stats.videos.slice().sort((left, right) => Number(right.viewCount || 0) - Number(left.viewCount || 0)).slice(0, 3),
-          categoryName: selectedNicheCategory?.name || "-",
-          seedKeyword: normalizedSeed
-        });
-      });
-
-      microNiches.sort((left, right) => {
-        if (right.viralityScore !== left.viralityScore) return right.viralityScore - left.viralityScore;
-        if (right.avgViews !== left.avgViews) return right.avgViews - left.avgViews;
-        return right.videoCount - left.videoCount;
-      });
-
-      return microNiches.slice(0, 30).map((item, index) => ({ ...item, rank: index + 1 }));
-    }
-
     function formatCompact(value) {
       const num = Number(value || 0);
       if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)}B`;
@@ -3384,20 +3079,9 @@
         const cache = readDiscoveredPhrasesCache(selectedNicheCategory.id);
         updateNicheCumulativeInfo((cache.phrases || []).length, 0);
       }
-      renderSeedSuggestions();
     }
 
     function estimateNicheQuota() {
-      const seedKeyword = getSeedKeywordValue();
-      if (seedKeyword) {
-        return {
-          total: 505,
-          step12: 505,
-          step4: 0,
-          hasVideoCache: false,
-          mode: "micro"
-        };
-      }
       const validateCount = Number(nicheMaxValidate.value || 20);
       const timePeriodDays = Number(nicheTimePeriod.value || 30);
       const region = nicheRegion.value || "US";
@@ -3410,8 +3094,7 @@
         total: step12 + step4,
         step12,
         step4,
-        hasVideoCache,
-        mode: "broad"
+        hasVideoCache
       };
     }
 
@@ -3429,9 +3112,7 @@
       const trackerDaily = 0;
       const usedToday = getDailyQuotaUsed();
       const projectedTotalToday = usedToday + trackerDaily + estimate.total;
-      if (estimate.mode === "micro") {
-        scanConfirmText.textContent = `Micro niche scan for ${selectedNicheCategory.name} > ${getSeedKeywordValue()} will use ~${estimate.total} quota units. This pulls 150-250 Shorts, fetches video stats, then extracts micro niches. Projected total today after scan: ${projectedTotalToday}/10000.`;
-      } else if (estimate.hasVideoCache) {
+      if (estimate.hasVideoCache) {
         scanConfirmText.textContent = `Video data cached. This scan will use ~${estimate.total} quota units (validation only). Step 1-2: ${estimate.step12} units (cached) + Step 4: ${estimate.step4} units. Auto-track uses PlaylistItems API (1 unit/check). Total today after scan: ${projectedTotalToday}/10000.`;
       } else {
         scanConfirmText.textContent = `This scan will use ~${estimate.total} quota units (full scan). Step 1-2: ${estimate.step12} units (fresh) + Step 4: ${estimate.step4} units. Auto-track uses PlaylistItems API (1 unit/check). Total today after scan: ${projectedTotalToday}/10000.`;
@@ -3676,10 +3357,7 @@
         opt.value = String(index);
         const newCount = Number(scan.newNichesCount || scan.results.length || 0);
         const cumulative = Number(scan.cumulativeDiscoveredCount || scan.results.length || 0);
-        const modeLabel = scan.mode === "micro" && scan.seedKeyword
-          ? `${scan.categoryName} > ${scan.seedKeyword}`
-          : scan.categoryName;
-        opt.textContent = `${modeLabel} - ${formatDateTime(scan.timestamp)} - ${newCount} new niches (cumulative: ${cumulative} total)`;
+        opt.textContent = `${scan.categoryName} - ${formatDateTime(scan.timestamp)} - ${newCount} new niches (cumulative: ${cumulative} total)`;
         pastScansSelect.appendChild(opt);
       });
     }
@@ -3689,18 +3367,8 @@
       if (Number.isNaN(index)) return;
       const scan = nicheScanHistory[index];
       if (!scan) return;
-      const matchingCategory = nicheCategories.find((category) => String(category.id) === String(scan.categoryId || ""));
-      if (matchingCategory) {
-        selectedNicheCategory = matchingCategory;
-        renderNicheCategoryCards();
-      }
       nicheResults = Array.isArray(scan.results) ? scan.results : [];
-      nicheResultsMode = scan.mode === "micro" ? "micro" : "broad";
-      currentMicroSeedKeyword = String(scan.seedKeyword || "").trim();
-      if (seedKeywordInput) seedKeywordInput.value = currentMicroSeedKeyword;
-      nicheSortState = isMicroNicheMode()
-        ? { field: "viralityScore", direction: "desc" }
-        : { field: "nicheScore", direction: "desc" };
+      nicheSortState = { field: "nicheScore", direction: "desc" };
       renderNicheResults();
       showToast("Loaded past scan without API usage.");
     }
@@ -3719,26 +3387,6 @@
     }
 
     function getFilteredNicheResults() {
-      if (isMicroNicheMode()) {
-        const filtered = nicheResults.slice();
-        const { field, direction } = nicheSortState;
-        filtered.sort((a, b) => {
-          let av = a[field];
-          let bv = b[field];
-          if (typeof av === "string") {
-            av = av.toLowerCase();
-            bv = String(bv).toLowerCase();
-          }
-          if (av < bv) return direction === "asc" ? -1 : 1;
-          if (av > bv) return direction === "asc" ? 1 : -1;
-          return 0;
-        });
-        filtered.forEach((item, idx) => {
-          item.rank = idx + 1;
-        });
-        return filtered;
-      }
-
       const minScore = Number(nicheMinScore.value || 0);
       const minRepost = Number(nicheMinRepostability.value || 0);
       const keywordQ = nicheKeywordFilter.value.trim().toLowerCase();
@@ -3788,87 +3436,42 @@
     }
 
     function renderNicheResults() {
-      updateNicheModeUi();
       nicheFilteredResults = getFilteredNicheResults();
       nicheResultsBody.innerHTML = "";
-      nicheShowingCounter.textContent = isMicroNicheMode()
-        ? `Showing ${nicheFilteredResults.length} of ${nicheResults.length} micro niches`
-        : `Showing ${nicheFilteredResults.length} of ${nicheResults.length} niches`;
+      nicheShowingCounter.textContent = `Showing ${nicheFilteredResults.length} of ${nicheResults.length} niches`;
 
       if (!nicheResults.length) {
         nicheEmptyState.style.display = "block";
-        nicheEmptyState.textContent = isMicroNicheMode()
-          ? "Run a seed-keyword scan to generate micro niche opportunities."
-          : "Run Niche Discovery to generate opportunities.";
-        if (microSummary) {
-          microSummary.classList.remove("open");
-          microSummary.textContent = "";
-        }
+        nicheEmptyState.textContent = "Run Niche Discovery to generate opportunities.";
         return;
       }
       if (!nicheFilteredResults.length) {
         nicheEmptyState.style.display = "block";
-        nicheEmptyState.textContent = isMicroNicheMode() ? "No micro niches found for this seed keyword." : "No niches match current filters.";
-        if (microSummary && isMicroNicheMode()) {
-          microSummary.classList.add("open");
-          microSummary.textContent = `Scanned ${selectedNicheCategory?.name || "selected category"} > ${currentMicroSeedKeyword || getSeedKeywordValue()}. Adjust the seed keyword or time period for more patterns.`;
-        }
+        nicheEmptyState.textContent = "No niches match current filters.";
         return;
       }
       nicheEmptyState.style.display = "none";
 
-      if (microSummary) {
-        if (isMicroNicheMode()) {
-          const totalVideos = nicheFilteredResults.reduce((sum, item) => sum + Number(item.videoCount || 0), 0);
-          microSummary.classList.add("open");
-          microSummary.textContent = `Micro niche scan for ${selectedNicheCategory?.name || "category"} > ${currentMicroSeedKeyword || getSeedKeywordValue()}: ${nicheFilteredResults.length} opportunities from ${totalVideos} matched video-pattern hits.`;
-        } else {
-          microSummary.classList.remove("open");
-          microSummary.textContent = "";
-        }
-      }
-
       const fragment = document.createDocumentFragment();
       nicheFilteredResults.forEach((item) => {
         const tr = document.createElement("tr");
-        if (isMicroNicheMode()) {
-          const topVideoHints = Array.isArray(item.topVideos) && item.topVideos.length
-            ? item.topVideos.map((video) => `${video.title} (${formatCompact(video.viewCount)})`).join(" | ")
-            : "No top videos captured.";
-          tr.innerHTML = `
-            <td>
-              <div style="display:grid;gap:6px;">
-                <strong>${escapeHtml(item.keyword)}</strong>
-                <div class="small-muted">${escapeHtml(topVideoHints)}</div>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">${getMicroInsightBadges(item)}</div>
-              </div>
-            </td>
-            <td>${item.videoCount}</td>
-            <td>${formatCompact(item.avgViews)}</td>
-            <td>${item.channelCount}</td>
-            <td class="${getViralityClass(item.viralityScore)}">${formatCompact(item.viralityScore)}</td>
-            <td><span class="competition-chip ${item.competitionClass}">${item.competition}</span></td>
-            <td><button class="btn btn-secondary" type="button" data-deep-search="${escapeHtml(item.keyword)}">Explore</button></td>
-          `;
-        } else {
-          tr.innerHTML = `
-            <td>${item.rank}</td>
-            <td>${escapeHtml(item.keyword)}</td>
-            <td class="${getScoreClass(item.nicheScore)}">${item.nicheScore}</td>
-            <td class="${getRatioClass(item.repostabilityPct)}">${item.repostabilityPct}%</td>
-            <td>${item.frequency}</td>
-            <td>${formatCompact(item.avgViews)}</td>
-            <td>${formatCompact(item.topViews)}</td>
-            <td>${item.count1mPlus}</td>
-            <td>${item.uniqueChannels}</td>
-            <td>${item.smallChannels}</td>
-            <td><span class="status-chip ${item.statusClass}">${item.statusText}</span></td>
-            <td>
-              <button class="btn btn-secondary" type="button" data-deep-search="${escapeHtml(item.keyword)}">Deep Search</button>
-              <button class="btn btn-secondary" type="button" data-save-niche="${escapeHtml(item.keyword)}">Save</button>
-            </td>
-          `;
-        }
+        tr.innerHTML = `
+          <td>${item.rank}</td>
+          <td>${escapeHtml(item.keyword)}</td>
+          <td class="${getScoreClass(item.nicheScore)}">${item.nicheScore}</td>
+          <td class="${getRatioClass(item.repostabilityPct)}">${item.repostabilityPct}%</td>
+          <td>${item.frequency}</td>
+          <td>${formatCompact(item.avgViews)}</td>
+          <td>${formatCompact(item.topViews)}</td>
+          <td>${item.count1mPlus}</td>
+          <td>${item.uniqueChannels}</td>
+          <td>${item.smallChannels}</td>
+          <td><span class="status-chip ${item.statusClass}">${item.statusText}</span></td>
+          <td>
+            <button class="btn btn-secondary" type="button" data-deep-search="${escapeHtml(item.keyword)}">Deep Search</button>
+            <button class="btn btn-secondary" type="button" data-save-niche="${escapeHtml(item.keyword)}">Save</button>
+          </td>
+        `;
         fragment.appendChild(tr);
       });
       nicheResultsBody.appendChild(fragment);
@@ -3884,96 +3487,6 @@
       renderNicheResults();
     }
     window.sortNicheResults = sortNicheResults;
-
-    async function fetchMicroNicheSeedVideos(seedKeyword, publishedAfter, regionCode) {
-      const searchItems = [];
-      let nextPageToken = "";
-
-      for (let page = 1; page <= 5; page++) {
-        if (nicheScanCancelRequested) break;
-        updateNicheProgress(`🔍 Scanning ${selectedNicheCategory.name} > ${seedKeyword} for micro niches...`, Math.min(10 + (page * 12), 55), `Fetching Shorts... Page ${page}/5`);
-        const params = {
-          part: "snippet",
-          q: seedKeyword,
-          type: "video",
-          videoDuration: "short",
-          videoCategoryId: String(selectedNicheCategory.id),
-          order: "viewCount",
-          regionCode,
-          maxResults: "50",
-          publishedAfter
-        };
-        if (nextPageToken) params.pageToken = nextPageToken;
-        const url = buildUrl("search", params);
-        const data = await fetchJsonLogged(url, `Micro Search Page ${page}/5`);
-        nicheCurrentQuotaUsed += 100;
-
-        const items = Array.isArray(data.items) ? data.items : [];
-        searchItems.push(...items);
-        nextPageToken = String(data.nextPageToken || "").trim();
-        if (!nextPageToken) break;
-        if (searchItems.length >= 250) break;
-        await sleep(350);
-      }
-
-      const uniqueVideoIds = Array.from(new Set(searchItems.map((item) => item?.id?.videoId).filter(Boolean)));
-      const videoMap = new Map();
-
-      updateNicheProgress(`🔍 Scanning ${selectedNicheCategory.name} > ${seedKeyword} for micro niches...`, 62, `Found ${uniqueVideoIds.length} videos, fetching statistics...`);
-
-      const videoBatches = chunkArray(uniqueVideoIds, 50);
-      for (let index = 0; index < videoBatches.length; index++) {
-        if (nicheScanCancelRequested) break;
-        const url = buildUrl("videos", {
-          part: "snippet,statistics",
-          id: videoBatches[index].join(",")
-        });
-        const data = await fetchJsonLogged(url, `Micro Stats ${index + 1}/${videoBatches.length}`);
-        nicheCurrentQuotaUsed += 1;
-        (data.items || []).forEach((video) => {
-          videoMap.set(video.id, {
-            videoId: video.id,
-            title: video?.snippet?.title || "",
-            tags: Array.isArray(video?.snippet?.tags) ? video.snippet.tags : [],
-            viewCount: Number(video?.statistics?.viewCount || 0),
-            channelId: video?.snippet?.channelId || "",
-            channelTitle: video?.snippet?.channelTitle || ""
-          });
-        });
-      }
-
-      return uniqueVideoIds.map((id) => videoMap.get(id)).filter(Boolean);
-    }
-
-    async function runMicroNicheScan(seedKeyword, publishedAfter, regionCode) {
-      updateNicheProgress(`🔍 Scanning ${selectedNicheCategory.name} > ${seedKeyword} for micro niches...`, 5, `Scanning ${selectedNicheCategory.name} > ${seedKeyword} for micro niches...`);
-      const videos = await fetchMicroNicheSeedVideos(seedKeyword, publishedAfter, regionCode);
-
-      if (!videos.length) {
-        nicheResultsMode = "micro";
-        currentMicroSeedKeyword = seedKeyword;
-        nicheResults = [];
-        nicheSortState = { field: "viralityScore", direction: "desc" };
-        renderNicheResults();
-        updateNicheProgress("Micro niche scan complete", 100, "No matching Shorts found for that seed keyword.");
-        return [];
-      }
-
-      updateNicheProgress(`Found ${videos.length} videos, analyzing patterns...`, 75, `Found ${videos.length} videos, analyzing patterns...`);
-      await sleep(250);
-      updateNicheProgress("Extracting micro niches...", 88, "Grouping recurring title phrases and keyword patterns...");
-
-      const microNiches = extractMicroNiches(videos, seedKeyword);
-      nicheResultsMode = "micro";
-      currentMicroSeedKeyword = seedKeyword;
-      nicheResults = microNiches;
-      nicheSortState = { field: "viralityScore", direction: "desc" };
-      renderNicheResults();
-
-      updateNicheProgress("Micro niche scan complete", 100, `Found ${microNiches.length} micro niches from ${videos.length} videos. Quota used: ${nicheCurrentQuotaUsed}`);
-      showToast(`Found ${microNiches.length} micro niches for ${seedKeyword}.`);
-      return microNiches;
-    }
 
     async function startNicheScan() {
       if (nicheScanInProgress) return;
@@ -4000,7 +3513,6 @@
       const minFreq = Number(nicheMinFreq.value || 3);
       const maxValidate = Number(nicheMaxValidate.value || 20);
       const publishedAfter = getPublishedAfterFromDays(days);
-      const seedKeyword = getSeedKeywordValue();
       const preKnownCache = readDiscoveredPhrasesCache(selectedNicheCategory.id);
 
       console.log(`Step 1: Starting scan for category ${selectedNicheCategory?.id} with ${getConfiguredAPIKeys().length} API key(s)...`);
@@ -4009,8 +3521,6 @@
       console.log("Step 1: Settings", { regionCode, days, minFreq, maxValidate, categoryName: selectedNicheCategory?.name });
 
       let partialResults = [];
-      nicheResultsMode = seedKeyword ? "micro" : "broad";
-      currentMicroSeedKeyword = seedKeyword;
       nicheResults = [];
       renderNicheResults();
       let scanUsedVideoCache = false;
@@ -4019,15 +3529,6 @@
       let cumulativeDiscoveredCount = 0;
 
       try {
-        if (seedKeyword) {
-          await runMicroNicheScan(seedKeyword, publishedAfter, regionCode);
-          cumulativeDiscoveredCount = nicheResults.length;
-          updateNicheCumulativeInfo(cumulativeDiscoveredCount, nicheResults.length);
-          return;
-        }
-
-        nicheResultsMode = "broad";
-        currentMicroSeedKeyword = "";
         if ((preKnownCache.phrases || []).length > 0) {
           updateNicheProgress("Step 1/4: Preparing scan...", 1, `Skipping ${(preKnownCache.phrases || []).length} previously discovered phrases...`);
         }
@@ -4195,8 +3696,6 @@
           timestamp: new Date().toISOString(),
           categoryId: selectedNicheCategory.id,
           categoryName: selectedNicheCategory.name,
-          mode: nicheResultsMode,
-          seedKeyword: currentMicroSeedKeyword,
           results: nicheResults,
           cacheUsed: scanUsedVideoCache,
           skippedPhrasesCount: scanSkippedPhrases,
