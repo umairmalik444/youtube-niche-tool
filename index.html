@@ -78,12 +78,17 @@
       font-size: 0.86rem;
       font-weight: 700;
       cursor: pointer;
+      user-select: none;
       transition: all 0.2s ease;
     }
 
     .notification-badge:hover {
-      border-color: var(--accent);
-      background: #123247;
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+    }
+
+    .notification-badge:active {
+      transform: translateY(0);
     }
 
     .notification-badge.active {
@@ -3115,6 +3120,10 @@
         : "📡 In-app monitoring: Paused (tab hidden) • Slack alerts: Handled by cloud system";
     }
 
+    function areChromeNotificationsDisabled() {
+      return localStorage.getItem("notificationsDisabled") === "true";
+    }
+
     async function checkChannelRSS(channelId, channel) {
       const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(String(channelId || "").trim())}`;
       let lastError = null;
@@ -3163,6 +3172,7 @@
     function showInAppAlert(channelTitle, videoTitle, videoId, niche) {
       const safeVideoId = String(videoId || "").trim();
       if (!safeVideoId) return;
+      const notificationsDisabled = areChromeNotificationsDisabled();
 
       alertHistory.unshift({
         timestamp: new Date().toISOString(),
@@ -3182,7 +3192,9 @@
       showToast(`🎯 ${String(channelTitle || "Unknown Channel")}: ${String(videoTitle || "Untitled")}`);
 
       try {
-        if ("Notification" in window && Notification.permission === "granted") {
+        if (notificationsDisabled) {
+          console.log("Chrome notifications disabled by user");
+        } else if ("Notification" in window && Notification.permission === "granted") {
           if (navigator.serviceWorker && navigator.serviceWorker.ready) {
             navigator.serviceWorker.ready.then((registration) => {
               registration.showNotification("🎯 New Video!", {
@@ -6876,36 +6888,40 @@
     }
 
     function updateNotificationBadge() {
-      if (!notificationBadge) return;
-      const textEl = notificationText || document.getElementById("notificationText");
-      const setText = (value) => {
-        if (textEl) textEl.textContent = value;
-        else notificationBadge.textContent = value;
-      };
+      const badge = notificationBadge || document.getElementById("notificationBadge");
+      const text = notificationText || document.getElementById("notificationText");
+      if (!badge || !text) return;
 
-      notificationBadge.classList.remove("active", "blocked", "disabled");
       if (!("Notification" in window)) {
-        setText("Not Supported");
-        notificationBadge.classList.add("disabled");
-        notificationBadge.disabled = true;
+        text.textContent = "Not Supported";
+        badge.style.borderColor = "var(--muted)";
+        badge.style.background = "rgba(158, 178, 197, 0.1)";
+        badge.style.cursor = "not-allowed";
         return;
       }
 
-      notificationBadge.disabled = false;
-      if (Notification.permission === "granted") {
-        setText("✓ Notifications Active");
-        notificationBadge.classList.add("active");
-        notificationBadge.style.borderColor = "var(--accent)";
-        notificationBadge.style.background = "rgba(61, 217, 165, 0.25)";
+      const isDisabled = areChromeNotificationsDisabled();
+
+      if (Notification.permission === "granted" && !isDisabled) {
+        text.textContent = "🔔 Notifications ON";
+        badge.style.borderColor = "var(--accent)";
+        badge.style.background = "rgba(61, 217, 165, 0.25)";
+        badge.style.cursor = "pointer";
+      } else if (Notification.permission === "granted" && isDisabled) {
+        text.textContent = "🔕 Notifications OFF";
+        badge.style.borderColor = "var(--muted)";
+        badge.style.background = "rgba(158, 178, 197, 0.1)";
+        badge.style.cursor = "pointer";
       } else if (Notification.permission === "denied") {
-        setText("⚠ Notifications Blocked");
-        notificationBadge.classList.add("blocked");
-        notificationBadge.style.borderColor = "var(--danger)";
-        notificationBadge.style.background = "rgba(255, 106, 106, 0.15)";
+        text.textContent = "⚠ Blocked";
+        badge.style.borderColor = "#ff6a6a";
+        badge.style.background = "rgba(255, 106, 106, 0.15)";
+        badge.style.cursor = "pointer";
       } else {
-        setText("🔔 Enable Notifications");
-        notificationBadge.style.borderColor = "var(--accent)";
-        notificationBadge.style.background = "rgba(61, 217, 165, 0.15)";
+        text.textContent = "🔔 Enable Notifications";
+        badge.style.borderColor = "var(--accent)";
+        badge.style.background = "rgba(61, 217, 165, 0.15)";
+        badge.style.cursor = "pointer";
       }
     }
 
@@ -6916,24 +6932,22 @@
       }
 
       if (Notification.permission === "granted") {
-        try {
-          const registration = await navigator.serviceWorker.ready;
-          await registration.showNotification("🔔 Test Notification", {
-            body: "Notifications are working!",
-            icon: "https://www.youtube.com/favicon.ico",
-            vibrate: [200, 100, 200]
-          });
-          showToast("✅ Notifications already active - test sent!");
-        } catch (error) {
-          showToast(`Error sending test notification: ${error.message}`);
-          console.error("SW showNotification failed:", error);
+        const isDisabled = areChromeNotificationsDisabled();
+
+        if (isDisabled) {
+          localStorage.setItem("notificationsDisabled", "false");
+          updateNotificationBadge();
+          showToast("✅ Notifications turned ON");
+        } else {
+          localStorage.setItem("notificationsDisabled", "true");
+          updateNotificationBadge();
+          showToast("🔕 Notifications turned OFF - you won't receive Chrome alerts");
         }
-        updateNotificationBadge();
         return;
       }
 
       if (Notification.permission === "denied") {
-        showToast("⚠️ Notifications blocked. Go to browser settings > Site Settings > Notifications > Allow for this site");
+        showToast("⚠️ Notifications blocked by browser. Go to browser Settings > Site Settings > Notifications > Allow this site");
         updateNotificationBadge();
         return;
       }
@@ -6942,20 +6956,15 @@
         const permission = await Notification.requestPermission();
         updateNotificationBadge();
         if (permission === "granted") {
-          const registration = await navigator.serviceWorker.ready;
-          await registration.showNotification("🔔 Notifications Enabled!", {
-            body: "You will now receive alerts for new videos",
-            icon: "https://www.youtube.com/favicon.ico",
-            vibrate: [200, 100, 200]
-          });
+          localStorage.setItem("notificationsDisabled", "false");
+          updateNotificationBadge();
           await subscribeToWebPush();
           showToast("✅ Notifications enabled!");
         } else {
           showToast("⚠️ Notification permission denied");
         }
       } catch (error) {
-        showToast(`Error requesting permission: ${error.message}`);
-        console.error("Permission request error:", error);
+        showToast(`Error: ${error.message}`);
       }
     }
 
@@ -7005,6 +7014,10 @@
     }
 
     async function sendPushNotification(channelTitle, videoTitle) {
+      if (areChromeNotificationsDisabled()) {
+        console.log("Chrome notifications disabled by user");
+        return;
+      }
       if (!("Notification" in window)) return;
       if (Notification.permission !== "granted") return;
 
@@ -7024,6 +7037,11 @@
     }
 
     async function testNotification() {
+      if (areChromeNotificationsDisabled()) {
+        console.log("Chrome notifications disabled by user");
+        showToast("🔕 Notifications are OFF. Click the header badge to turn ON.");
+        return;
+      }
       if (Notification.permission !== "granted") {
         showToast("Enable notifications first");
         return;
@@ -8107,13 +8125,13 @@
       }
 
       if (trackerPrimaryControls) trackerPrimaryControls.style.display = admin ? "flex" : "flex";
-      if (checkNowBtn) checkNowBtn.style.display = admin ? "" : "none";
-      if (autoTrackToggleWrap) autoTrackToggleWrap.style.display = admin ? "" : "none";
-      if (autoCheckIntervalLabel) autoCheckIntervalLabel.style.display = admin ? "" : "none";
-      if (autoCheckInterval) autoCheckInterval.style.display = admin ? "" : "none";
-      if (alertWindowLabel) alertWindowLabel.style.display = admin ? "" : "none";
-      if (alertWindowSelect) alertWindowSelect.style.display = admin ? "" : "none";
-      if (ultraModeBadge) ultraModeBadge.style.display = admin ? "" : "none";
+      if (checkNowBtn) checkNowBtn.style.display = "";
+      if (autoTrackToggleWrap) autoTrackToggleWrap.style.display = "";
+      if (autoCheckIntervalLabel) autoCheckIntervalLabel.style.display = "";
+      if (autoCheckInterval) autoCheckInterval.style.display = "";
+      if (alertWindowLabel) alertWindowLabel.style.display = "";
+      if (alertWindowSelect) alertWindowSelect.style.display = "";
+      if (ultraModeBadge) ultraModeBadge.style.display = "";
       if (trackerStatus) trackerStatus.style.display = admin ? "" : "none";
       if (trackerCycleStats) trackerCycleStats.style.display = admin ? "" : "none";
       if (trackerPerfBadge) trackerPerfBadge.style.display = admin ? "" : "none";
