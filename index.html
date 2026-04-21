@@ -103,6 +103,53 @@
       background: rgba(255, 126, 126, 0.1);
     }
 
+    /* ── Quota Dashboard ─────────────────────────────────────── */
+    .quota-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .quota-card {
+      background: var(--bg-soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .quota-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .quota-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .quota-bar-container {
+      width: 100%;
+      height: 8px;
+      background: var(--bg-soft);
+      border-radius: 4px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .quota-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+      background: var(--accent);
+    }
+    .quota-details {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    @media (max-width: 768px) {
+      .quota-cards { grid-template-columns: repeat(2, 1fr); }
+    }
+
     h1 {
       margin: 0 0 8px;
       font-size: 1.7rem;
@@ -2218,6 +2265,40 @@
         </section>
       </div>
 
+      <!-- ADMIN ONLY: API Quota Dashboard -->
+      <div id="quotaDashboard" class="tracker-card" style="display:none; margin-top: 12px;">
+        <h3>📊 API Quota Usage</h3>
+        <div style="padding: 12px;">
+          <div class="quota-cards">
+            <div class="quota-card">
+              <div class="quota-label">Used Today</div>
+              <div class="quota-value" id="quotaUsedToday">--</div>
+            </div>
+            <div class="quota-card">
+              <div class="quota-label">Daily Limit</div>
+              <div class="quota-value" id="quotaDailyLimit">--</div>
+            </div>
+            <div class="quota-card">
+              <div class="quota-label">Remaining</div>
+              <div class="quota-value" id="quotaRemaining">--</div>
+            </div>
+            <div class="quota-card">
+              <div class="quota-label">Usage</div>
+              <div class="quota-value" id="quotaPercentage">--%</div>
+            </div>
+          </div>
+          <div class="quota-bar-container">
+            <div class="quota-bar" id="quotaBar" style="width:0%"></div>
+          </div>
+          <div class="quota-details">
+            <span id="quotaCycles">-- check cycles today</span> •
+            <span id="quotaKeys">-- API keys active</span> •
+            <span id="quotaErrors">-- errors</span>
+          </div>
+          <button class="btn btn-secondary" type="button" onclick="refreshQuotaDashboard()">🔄 Refresh</button>
+        </div>
+      </div>
+
       <!-- MEMBER ONLY -->
       <div id="memberOnlySettings">
         <section class="tracker-card" style="margin-top: 12px;">
@@ -3092,6 +3173,8 @@
       }
       if (isSettings && isAdmin()) {
         renderMembersTable();
+        const qd = document.getElementById("quotaDashboard");
+        if (qd) { qd.style.display = "block"; refreshQuotaDashboard(); }
       }
     }
 
@@ -3122,6 +3205,36 @@
 
     function areChromeNotificationsDisabled() {
       return localStorage.getItem("notificationsDisabled") === "true";
+    }
+
+    async function refreshQuotaDashboard() {
+      const sheetUrl = String(GOOGLE_SHEET_URL || localStorage.getItem(GOOGLE_SHEET_URL_STORAGE) || "").trim();
+      if (!sheetUrl) return;
+      try {
+        const response = await fetch(sheetUrl, { redirect: "follow" });
+        const data = await response.json();
+        if (data.quota) {
+          const q = data.quota;
+          document.getElementById("quotaUsedToday").textContent = formatNumber(q.today);
+          document.getElementById("quotaDailyLimit").textContent = formatNumber(q.limit);
+          document.getElementById("quotaRemaining").textContent = formatNumber(q.remaining);
+          document.getElementById("quotaPercentage").textContent = q.percentage + "%";
+          document.getElementById("quotaCycles").textContent = q.cycles + " check cycles today";
+          document.getElementById("quotaKeys").textContent = q.keys + " API keys active";
+          document.getElementById("quotaErrors").textContent = q.errors + " errors";
+          const bar = document.getElementById("quotaBar");
+          bar.style.width = Math.min(q.percentage, 100) + "%";
+          if (q.percentage > 80) {
+            bar.style.background = "#ff6a6a";
+          } else if (q.percentage > 60) {
+            bar.style.background = "#ffd700";
+          } else {
+            bar.style.background = "var(--accent)";
+          }
+        }
+      } catch (e) {
+        console.log("Quota fetch failed:", e);
+      }
     }
 
     async function checkChannelRSS(channelId, channel) {
@@ -8103,6 +8216,8 @@
       if (tabTeam) tabTeam.style.display = admin ? "" : "none";
       if (adminOnlySettings) adminOnlySettings.style.display = admin ? "" : "none";
       if (memberOnlySettings) memberOnlySettings.style.display = admin ? "none" : "";
+      const quotaDashboardEl = document.getElementById("quotaDashboard");
+      if (quotaDashboardEl) quotaDashboardEl.style.display = admin ? "block" : "none";
       if (googleSheetsConnectionSection) googleSheetsConnectionSection.style.display = "";
       if (syncActivitySection) syncActivitySection.style.display = admin ? "" : "none";
       if (saveProfileWrap) saveProfileWrap.style.display = admin ? "" : "none";
